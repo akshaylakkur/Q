@@ -72,6 +72,9 @@ export class WelcomeComponent implements Component {
     infoParts.push(
       `${primary("▸")} ${dim("Mode:")} ${text(this.state.permissionMode)}`,
     );
+    infoParts.push(
+      `${primary("▸")} ${dim("Exec:")} ${text(this.state.executionMode || "not set")}`,
+    );
     if (this.state.planMode) {
       infoParts.push(`${primary("▸")} ${dim("Plan mode enabled")}`);
     }

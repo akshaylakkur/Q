@@ -67,6 +67,7 @@ export interface SlashCommandHost {
     isReplaying: boolean;
     contextTokens: number;
     maxContextTokens: number;
+    executionMode: string;
   };
 
   // Agent access
@@ -81,6 +82,12 @@ export interface SlashCommandHost {
     context: {
       messages: unknown[];
     };
+  };
+
+  // Orchestrator access (for mode switching etc.)
+  readonly orchestrator?: {
+    setCurrentMode(mode: string): void;
+    getCurrentMode(): string;
   };
 
   // UI feedback

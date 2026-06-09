@@ -123,6 +123,9 @@ export class StatusDashboardComponent extends Container implements Focusable {
     lines.push(
       `    ${dim("Plan:")}        ${state.planMode ? success("active") : dim("inactive")}`,
     );
+    lines.push(
+      `    ${dim("Execution:")}   ${textBright(state.executionMode || "not set")}`,
+    );
 
     const phaseLabel = formatPhase(state.streamingPhase);
     const phaseColor =

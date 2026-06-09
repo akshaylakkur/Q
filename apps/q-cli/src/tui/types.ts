@@ -21,6 +21,8 @@ export interface TuiAppState {
   contextUsage: number;
   isCompacting: boolean;
   isReplaying: boolean;
+  /** Current orchestrator execution mode (user-facing name) */
+  executionMode: string;
 }
 
 // ── Transcript Entries ─────────────────────────────────────────────────
@@ -113,6 +115,11 @@ export interface TuiOptions {
   planMode: boolean;
   yolo: boolean;
   auto: boolean;
+  /** Optional orchestrator reference for mode switching etc. */
+  orchestrator?: {
+    setCurrentMode(mode: string): void;
+    getCurrentMode(): string;
+  };
 }
 
 // ── Theme Colors ───────────────────────────────────────────────────────

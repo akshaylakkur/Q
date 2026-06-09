@@ -86,14 +86,14 @@ describe("submitPrompt", () => {
     expect(result).toHaveProperty("completedAt");
   });
 
-  it("selects DIRECT mode for simple single-file prompts", async () => {
+  it("returns AUTO mode for all prompts (the default natural behavior)", async () => {
     const result = await core.submitPrompt("Fix the typo in index.ts");
-    expect(result.mode).toBe(ExecutionModes.DIRECT);
+    expect(result.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("selects CAMPAIGN_CONTINUOUS for codebase generation", async () => {
+  it("selects AUTO mode for codebase generation prompts", async () => {
     const result = await core.submitPrompt("Generate the entire project from scratch with a full API layer, database schema, authentication, and testing suite including integration and unit tests with 90% coverage");
-    expect(result.mode).toBe(ExecutionModes.CAMPAIGN_CONTINUOUS);
+    expect(result.mode).toBe(ExecutionModes.AUTO);
   });
 
   it("produces output text", async () => {
@@ -221,10 +221,10 @@ describe("Mode dispatch", () => {
     core = new OrchestratorCore();
   });
 
-  it("DIRECT mode completes successfully", async () => {
+  it("AUTO mode (default) completes successfully", async () => {
     const result = await core.submitPrompt("Fix the typo in index.ts");
     expect(result.success).toBe(true);
-    expect(result.mode).toBe(ExecutionModes.DIRECT);
+    expect(result.mode).toBe(ExecutionModes.AUTO);
   });
 
   it("LIGHTWEIGHT_PLAN mode completes", async () => {
@@ -232,7 +232,7 @@ describe("Mode dispatch", () => {
     expect(result.success).toBe(true);
   });
 
-  it("PARALLEL_DISPATCH mode works", async () => {
+  it("AUTO mode works — classifies and executes naturally", async () => {
     const result = await core.submitPrompt("Refactor the entire auth module. We need to completely redesign the authentication flow to support modern security patterns.");
     expect(result.success).toBe(true);
   });

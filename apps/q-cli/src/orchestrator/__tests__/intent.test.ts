@@ -303,49 +303,54 @@ describe("Architectural impact detection", () => {
 // =========================================================================
 
 describe("Decision matrix", () => {
-  it("single_file + surface + high confidence → DIRECT", () => {
+  it("all classifications return AUTO mode (default natural behavior)", () => {
     const r = classify("Fix the typo in index.ts");
-    expect(r.mode).toBe(ExecutionModes.DIRECT);
+    expect(r.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("multi_file + moderate → LIGHTWEIGHT_PLAN", () => {
+  it("multi-file prompts also return AUTO mode", () => {
     const r = classify("Update auth.ts, userService.ts, and types.ts");
-    expect(r.mode).toBe(ExecutionModes.LIGHTWEIGHT_PLAN);
+    expect(r.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("module + deep → PARALLEL_DISPATCH", () => {
+  it("all classifications return AUTO mode (default natural behavior)", () => {
+    const r = classify("Fix a bug in index.ts");
+    expect(r.mode).toBe(ExecutionModes.AUTO);
+  });
+
+  it("module + deep returns AUTO mode", () => {
     const r = classify("This is a moderately long prompt that should trigger deep analysis. Refactor the entire auth module. We need to completely redesign the authentication flow to support modern security patterns.");
     expect(r.profile.scope).toBe("module");
-    expect(r.mode).toBe(ExecutionModes.PARALLEL_DISPATCH);
+    expect(r.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("cross_cutting + deep → ORCHESTRATED_CAMPAIGN", () => {
+  it("cross_cutting + deep returns AUTO mode", () => {
     const r = classify("Cross-cutting change to all services. This is a long detailed description of a cross-cutting concern that affects many different parts of the system. We need to carefully redesign the logging infrastructure, update all service boundaries, and ensure consistent error handling across the board. This will touch multiple modules and require careful orchestration.");
-    expect(r.mode).toBe(ExecutionModes.ORCHESTRATED_CAMPAIGN);
+    expect(r.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("codebase_gen scope → CAMPAIGN_CONTINUOUS", () => {
+  it("codebase_gen scope returns AUTO mode", () => {
     const r = classify("Build a new microservice across the project");
-    expect(r.mode).toBe(ExecutionModes.CAMPAIGN_CONTINUOUS);
+    expect(r.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("campaign depth → CAMPAIGN_CONTINUOUS", () => {
+  it("campaign depth returns AUTO mode", () => {
     const r = classify("Generate a comprehensive auth system with OAuth");
     expect(r.profile.depth).toBe("campaign");
-    expect(r.mode).toBe(ExecutionModes.CAMPAIGN_CONTINUOUS);
+    expect(r.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("module + surface + parallel → PARALLEL_DISPATCH", () => {
+  it("module + surface + parallel returns AUTO mode", () => {
     const r = classify("Update the API:\n- Add new endpoint\n- Update docs\n- Write tests");
     expect(r.profile.scope).toBe("module");
     expect(r.profile.requiresParallel).toBe(true);
-    expect(r.mode).toBe(ExecutionModes.PARALLEL_DISPATCH);
+    expect(r.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("cross_cutting + moderate → LIGHTWEIGHT_PLAN", () => {
+  it("cross_cutting + moderate returns AUTO mode", () => {
     const r = classify("Cross-cutting update to error handling patterns");
     expect(r.profile.depth).toBe("moderate");
-    expect(r.mode).toBe(ExecutionModes.LIGHTWEIGHT_PLAN);
+    expect(r.mode).toBe(ExecutionModes.AUTO);
   });
 });
 
@@ -376,9 +381,10 @@ describe("Confidence scoring", () => {
 // =========================================================================
 
 describe("Reason string", () => {
-  it("includes the execution mode name in the reason", () => {
+  it("includes the mode name and profile in the reason", () => {
     const r = classify("Fix the typo in index.ts");
-    expect(r.reason).toContain("Direct");
+    expect(r.reason).toContain("Auto");
+    expect(r.reason).toContain("profile");
   });
 
   it("includes confidence percentage", () => {

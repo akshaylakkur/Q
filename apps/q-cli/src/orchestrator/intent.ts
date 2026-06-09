@@ -559,93 +559,22 @@ export class IntentClassifier {
 
   // -----------------------------------------------------------------------
   // Decision matrix — IntentProfile → ExecutionMode
+  //
+  // AUTO mode is the default natural system behavior: the IntentClassifier
+  // analyzes every prompt and the orchestrator handles execution based on
+  // the profile's scope, depth, and confidence metrics. The profile data
+  // (estimated files, turns, parallelism, verification needs) is passed
+  // through so downstream systems can adapt their behavior accordingly.
   // -----------------------------------------------------------------------
 
   private modeForProfile(profile: IntentProfile): { mode: ExecutionMode; reason: string } {
     const { scope, depth, confidence } = profile;
 
-    // High-confidence single-file surface changes → DIRECT
-    if (scope === "single_file" && depth === "surface" && confidence >= 0.7) {
-      return {
-        mode: ExecutionModes.DIRECT,
-        reason: `Single-file surface change detected (confidence: ${(confidence * 100).toFixed(0)}%). Direct execution without planning overhead.`,
-      };
-    }
-
-    // Multi-file moderate work → LIGHTWEIGHT_PLAN
-    if (scope === "multi_file" && (depth === "surface" || depth === "moderate")) {
-      return {
-        mode: ExecutionModes.LIGHTWEIGHT_PLAN,
-        reason: `Multi-file change spanning several files. Lightweight plan to coordinate edits (confidence: ${(confidence * 100).toFixed(0)}%).`,
-      };
-    }
-
-    // Single-file moderate (but not high confidence) → LIGHTWEIGHT_PLAN
-    if (scope === "single_file" && depth === "moderate" && confidence < 0.8) {
-      return {
-        mode: ExecutionModes.LIGHTWEIGHT_PLAN,
-        reason: `Moderate single-file change with moderate confidence. Using lightweight plan for safety.`,
-      };
-    }
-
-    // Module-level deep work with parallel structure → PARALLEL_DISPATCH
-    if (scope === "module" && depth === "deep") {
-      return {
-        mode: ExecutionModes.PARALLEL_DISPATCH,
-        reason: `Module-level deep change. ${profile.requiresParallel ? "Parallel structure detected — dispatching independent tasks concurrently." : "Dispatching sub-tasks to parallel agents for efficiency."} (confidence: ${(confidence * 100).toFixed(0)}%)`,
-      };
-    }
-
-    // Cross-cutting deep work → ORCHESTRATED_CAMPAIGN
-    if (scope === "cross_cutting" && (depth === "deep" || depth === "campaign")) {
-      return {
-        mode: ExecutionModes.ORCHESTRATED_CAMPAIGN,
-        reason: `Cross-cutting change with deep impact. Full orchestration campaign to manage dependencies and convergence (confidence: ${(confidence * 100).toFixed(0)}%).`,
-      };
-    }
-
-    // Codebase-gen / campaign depth → CAMPAIGN_CONTINUOUS
-    if (scope === "codebase_gen" || depth === "campaign") {
-      return {
-        mode: ExecutionModes.CAMPAIGN_CONTINUOUS,
-        reason: `Codebase-wide generation or campaign-depth task. Continuous orchestration with ongoing convergence monitoring (confidence: ${(confidence * 100).toFixed(0)}%).`,
-      };
-    }
-
-    // Module-level moderate → LIGHTWEIGHT_PLAN (or PARALLEL_DISPATCH if parallel)
-    if (scope === "module" && (depth === "surface" || depth === "moderate")) {
-      if (profile.requiresParallel) {
-        return {
-          mode: ExecutionModes.PARALLEL_DISPATCH,
-          reason: `Module-level task with parallel sub-tasks. Dispatching concurrently (confidence: ${(confidence * 100).toFixed(0)}%).`,
-        };
-      }
-      return {
-        mode: ExecutionModes.LIGHTWEIGHT_PLAN,
-        reason: `Module-level change. Lightweight plan to coordinate across module boundaries (confidence: ${(confidence * 100).toFixed(0)}%).`,
-      };
-    }
-
-    // Multi-file deep → PARALLEL_DISPATCH
-    if (scope === "multi_file" && depth === "deep") {
-      return {
-        mode: ExecutionModes.PARALLEL_DISPATCH,
-        reason: `Deep multi-file change. Parallel dispatch for independent sub-tasks (confidence: ${(confidence * 100).toFixed(0)}%).`,
-      };
-    }
-
-    // Cross-cutting moderate → LIGHTWEIGHT_PLAN
-    if (scope === "cross_cutting" && depth === "moderate") {
-      return {
-        mode: ExecutionModes.LIGHTWEIGHT_PLAN,
-        reason: `Cross-cutting moderate change. Lightweight plan to scope the impact (confidence: ${(confidence * 100).toFixed(0)}%).`,
-      };
-    }
-
-    // Fallback: LIGHTWEIGHT_PLAN for anything that doesn't match above
+    // AUTO: the natural system-default mode. Everything flows through
+    // the orchestrator's standard pipeline using the profile data.
     return {
-      mode: ExecutionModes.LIGHTWEIGHT_PLAN,
-      reason: `Change profile: ${scope}, ${depth} (confidence: ${(confidence * 100).toFixed(0)}%). Using lightweight plan as default safe mode.`,
+      mode: ExecutionModes.AUTO,
+      reason: `Auto mode selected — profile: ${scope}, ${depth} (confidence: ${(confidence * 100).toFixed(0)}%). The orchestrator will determine the optimal execution strategy.`,
     };
   }
 }

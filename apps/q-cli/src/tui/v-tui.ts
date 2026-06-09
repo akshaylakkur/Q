@@ -50,7 +50,7 @@ import { HelpPanelComponent } from "./components/help-panel.js";
 import { StatusDashboardComponent } from "./components/status-dashboard.js";
 
 // ── Slash command system ────────────────────────────────────────────
-import { dispatchInput, ALL_SLASH_COMMANDS, sortSlashCommands, type SlashCommandHost } from "./commands/index.js";
+import { dispatchInput, ALL_SLASH_COMMANDS, sortSlashCommands, type SlashCommandHost, type QSlashCommand } from "./commands/index.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -117,6 +117,9 @@ export class QTui {
   private dialogComponent: (Container & import("@earendil-works/pi-tui").Focusable) | null = null;
   private savedEditorContent: string = "";
 
+  // Orchestrator reference
+  private orchestratorHost?: { setCurrentMode(mode: string): void; getCurrentMode(): string };
+
   // Event handlers
   private onExit?: () => Promise<void>;
   /** Dispose function for the global keyboard input listener */
@@ -128,6 +131,7 @@ export class QTui {
     this.sessionId = options.sessionId;
     this.colors = { ...DEFAULT_COLORS };
     this.markdownTheme = createMarkdownTheme(this.colors);
+    this.orchestratorHost = options.orchestrator;
 
     // App state
     this.appState = {
@@ -145,6 +149,7 @@ export class QTui {
       contextUsage: 0,
       isCompacting: false,
       isReplaying: false,
+      executionMode: "not set",
     };
 
     // Create terminal
@@ -329,12 +334,11 @@ export class QTui {
    * This provides fuzzy matching on command names with descriptions.
    */
   private setupAutocomplete(): void {
-    const slashCommands: SlashCommand[] = sortSlashCommands(
-      ALL_SLASH_COMMANDS as unknown as typeof ALL_SLASH_COMMANDS,
-    ).map((cmd) => ({
+    const slashCommands: SlashCommand[] = (ALL_SLASH_COMMANDS as unknown as QSlashCommand[]).map((cmd) => ({
       name: cmd.name,
       description: cmd.description,
       argumentHint: cmd.usage ? cmd.usage.split(/\s+/).slice(1).join(" ") : undefined,
+      getArgumentCompletions: cmd.getArgumentCompletions,
     }));
     const provider = new CombinedAutocompleteProvider(slashCommands, this.workDir);
     this.editor.setAutocompleteProvider(provider);
@@ -443,6 +447,7 @@ export class QTui {
    */
   private createSlashCommandHost(): SlashCommandHost {
     const agent = this.agent;
+    const orchHost = this.orchestratorHost;
     return {
       appState: this.appState,
       agent: {
@@ -461,6 +466,12 @@ export class QTui {
           },
         },
       },
+      orchestrator: orchHost
+        ? {
+            setCurrentMode: (mode: string) => orchHost.setCurrentMode(mode),
+            getCurrentMode: () => orchHost.getCurrentMode(),
+          }
+        : undefined,
       showStatus: (message: string, colorOrType?: string) => this.showStatus(message, colorOrType),
       showError: (message: string) => this.showError(message),
       showNotice: (title: string, detail?: string) => {

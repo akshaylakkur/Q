@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "build:sync": "tsdown && cp dist/main.mjs \"${Q_HOME:-$HOME/.Q}/build/apps/q-cli/dist/main.mjs\" 2>/dev/null; cp dist/main.mjs.map \"${Q_HOME:-$HOME/.Q}/build/apps/q-cli/dist/main.mjs.map\" 2>/dev/null; echo '✓ synced to ~/.Q/build/'",
     "dev": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

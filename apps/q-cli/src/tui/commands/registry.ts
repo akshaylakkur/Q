@@ -6,6 +6,20 @@
  */
 
 import type { QSlashCommand, CommandCategory } from "./types.js";
+import type { AutocompleteItem } from "@earendil-works/pi-tui";
+
+// =========================================================================
+// Mode argument completions (shared with agent.ts handler)
+// =========================================================================
+
+export const MODE_ARGUMENT_COMPLETIONS: AutocompleteItem[] = [
+  { value: "auto", label: "auto", description: "Default natural system behavior (classifier-driven)" },
+  { value: "lightweight", label: "lightweight", description: "Lightweight plan execution" },
+  { value: "speed-campaign", label: "speed-campaign", description: "Fast parallel dispatch" },
+  { value: "medium-campaign", label: "medium-campaign", description: "Orchestrated multi-wave campaign" },
+  { value: "high-campaign", label: "high-campaign", description: "Continuous campaign with convergence" },
+  { value: "modus-maximus", label: "modus-maximus", description: "Full orchestration pipeline" },
+];
 
 // =========================================================================
 // Full command definitions
@@ -71,10 +85,11 @@ export const ALL_SLASH_COMMANDS = [
   {
     name: "mode",
     aliases: ["execution"],
-    description: "Switch orchestrator execution mode (direct, plan, campaign, parallel)",
+    description: "Switch orchestrator execution mode: auto, lightweight, speed-campaign, medium-campaign, high-campaign, modus-maximus",
     category: "agent" as CommandCategory,
     priority: 90,
     usage: "/mode <name>",
+    getArgumentCompletions: (_argumentPrefix: string) => MODE_ARGUMENT_COMPLETIONS,
   },
   {
     name: "plan",

@@ -182,85 +182,26 @@ export class OrchestratorCore {
       this.emitEvent({ type: "classification.complete", timestamp: iso(), data: { mode: classification.mode, scope: classification.profile.scope, depth: classification.profile.depth, reason: classification.reason } });
       this.originalProfile = classification.profile;
 
-      // Determine execution mode
-      const mode = this.config.defaultMode === "auto" ? classification.mode : this.config.defaultMode;
+      // Determine execution mode — user-selected mode takes priority,
+      // otherwise falls back to the classifier recommendation (which returns AUTO).
+      const mode: ExecutionMode = this.config.defaultMode === "auto"
+        ? classification.mode
+        : (this.config.defaultMode as ExecutionMode);
       this.currentMode = mode;
 
-      // ── Step 2: Execute based on mode ───────────────────────────────
-      if (mode === ExecutionModes.DIRECT || mode === ExecutionModes.LIGHTWEIGHT_PLAN) {
-        // Mode 0/1: execute directly, return to idle
-        const result = await this.executeDirectOrLightweight(mode, classification);
-        this.activeResult = result;
-        this.transitionTo("idle");
-        this.emitEvent({ type: "orchestration.complete", timestamp: iso(), data: { success: result.success, mode } });
-        return result;
-      }
-
-      // Mode 2/3/4: full orchestration pipeline
-      // ── Step 3: Activate plugins (before task decomposition) ───────────
-      if (this._pluginManager) {
-        try {
-          await this._pluginManager.activateAll();
-          this.emitEvent({ type: "plugins.activated", timestamp: iso(), data: { count: this._pluginManager.getStatus().length } });
-        } catch (err) {
-          // Plugin failures are non-fatal — log and continue
-          this.emitEvent({ type: "plugins.error", timestamp: iso(), data: { error: err instanceof Error ? err.message : String(err) } });
-        }
-      }
-
-      // ── Step 4: Plan (decompose into TaskGraph) ──────────────────────
-      this.transitionTo("planning");
-      const graph = this.taskDecomposer.decompose(classification.profile, topology);
-      this.activeGraph = graph;
-      this.emitEvent({ type: "planning.complete", timestamp: iso(), data: { totalTasks: graph.nodes.length, totalWaves: graph.waves.length } });
-
-      // ── Step 4: Dispatch waves with convergence between ──────────────
-      this.transitionTo("dispatching");
-      this.poolManager.start();
-
-      const dispatchResult = await this.taskDecomposer.dispatchWaves(
-        graph,
-        async () => {
-          // Converge between waves
-          await this.runConvergence();
-        },
-      );
-
-      // ── Step 5: Validate ────────────────────────────────────────────
-      this.transitionTo("validating");
-      const validationPassed = await this.runValidation(dispatchResult);
-
-      if (!validationPassed) {
-        // ── Step 6: Correct ─────────────────────────────────────────
-        this.transitionTo("correcting");
-        this.emitEvent({ type: "correction.start", timestamp: iso(), data: { errors: dispatchResult.errors } });
-        const corrected = await this.runSelfCorrection(dispatchResult);
-        if (!corrected) {
-          // Escalate mode if correction failed
-          const escalation = this.dynamicReclassifier.reclassify(this.buildMetrics());
-          if (escalation.shouldEscalate) {
-            this.emitEvent({ type: "mode.escalation", timestamp: iso(), data: { from: this.currentMode, to: escalation.recommendedMode, reason: escalation.reason } });
-            this.currentMode = escalation.recommendedMode;
-          }
-        }
-      }
-
-      // ── Build final result ─────────────────────────────────────────
-      const finalResult = this.buildFinalResult(dispatchResult, validationPassed, Date.now() - startedAt);
-      this.activeResult = finalResult;
-      this.transitionTo("completed");
-      this.emitEvent({ type: "orchestration.complete", timestamp: iso(), data: { success: finalResult.success, mode: this.currentMode } });
-
-      // Return to idle
+      // ── Step 2: Execute through the standard agentic loop.
+      // All modes flow through the same execution path at this stage.
+      // Future implementations will wire each mode to its specific strategy.
+      const result = await this.executeDirectOrLightweight(mode, classification);
+      this.activeResult = result;
       this.transitionTo("idle");
-      this.poolManager.stop();
-      return finalResult;
+      this.emitEvent({ type: "orchestration.complete", timestamp: iso(), data: { success: result.success, mode } });
+      return result;
     } catch (error) {
-      this.poolManager.stop();
       const errMsg = error instanceof Error ? error.message : String(error);
       this.activeResult = {
         success: false,
-        mode: this.currentMode ?? ExecutionModes.LIGHTWEIGHT_PLAN,
+        mode: this.currentMode ?? ExecutionModes.AUTO,
         taskId: this.activeTask?.id ?? "unknown",
         error: errMsg,
         durationMs: Date.now() - startedAt,
@@ -517,7 +458,7 @@ export class OrchestratorCore {
   }
 
   // =======================================================================
-  // Internal: Mode 0/1 execution
+  // Internal: AUTO/DIRECT/LIGHTWEIGHT_PLAN execution
   // =======================================================================
 
   private async executeDirectOrLightweight(
@@ -526,7 +467,7 @@ export class OrchestratorCore {
   ): Promise<ExecutionResult> {
     const startedAt = Date.now();
 
-    // Mode 0/1 applies Invisibility Principle: no pool/convergence events emitted
+    // AUTO/DIRECT/LIGHTWEIGHT_PLAN applies Invisibility Principle: no pool/convergence events emitted
     this.emitEvent({ type: "mode.execute", timestamp: iso(), data: { mode, scope: classification.profile.scope } });
 
     // Build a minimal task
@@ -537,15 +478,24 @@ export class OrchestratorCore {
       mode,
     };
 
-    if (mode === ExecutionModes.DIRECT) {
+    let result: ExecutionResult;
+
+    // AUTO mode: use the DIRECT handler as the natural default
+    if (mode === ExecutionModes.AUTO || mode === ExecutionModes.DIRECT) {
       const { DirectMode } = await import("./modes/direct-mode.js");
       const handler = new DirectMode();
-      return handler.execute(task, this);
+      result = await handler.execute(task, this);
+    } else {
+      const { LightweightPlanMode } = await import("./modes/lightweight-plan-mode.js");
+      const handler = new LightweightPlanMode();
+      result = await handler.execute(task, this);
     }
 
-    const { LightweightPlanMode } = await import("./modes/lightweight-plan-mode.js");
-    const handler = new LightweightPlanMode();
-    return handler.execute(task, this);
+    // Override the result mode to reflect what was actually requested
+    // (handlers always return their own hardcoded mode constant)
+    result.mode = mode;
+
+    return result;
   }
 
   // =======================================================================
@@ -685,11 +635,10 @@ export class OrchestratorCore {
   /** Map an ExecutionMode to a VerificationPipeline ExecutionModeLevel (0-4). */
   private modeToLevel(mode?: ExecutionMode): ExecutionModeLevel {
     switch (mode) {
+      case ExecutionModes.AUTO: return 0;
       case ExecutionModes.DIRECT: return 0;
       case ExecutionModes.LIGHTWEIGHT_PLAN: return 1;
-      case ExecutionModes.PARALLEL_DISPATCH: return 2;
-      case ExecutionModes.ORCHESTRATED_CAMPAIGN: return 3;
-      case ExecutionModes.CAMPAIGN_CONTINUOUS: return 4;
+      case ExecutionModes.MODUS_MAXIMUS: return 4;
       default: return 0;
     }
   }
@@ -963,18 +912,10 @@ note circular dependencies, and suggest boundary rules.`;
     const mode = this.currentMode;
 
     // Invisibility Principle:
-    // Mode 0/1: no pool or convergence events
-    if (mode === ExecutionModes.DIRECT || mode === ExecutionModes.LIGHTWEIGHT_PLAN) {
+    // AUTO/DIRECT/LIGHTWEIGHT_PLAN: no pool or convergence events
+    if (mode === ExecutionModes.AUTO || mode === ExecutionModes.DIRECT || mode === ExecutionModes.LIGHTWEIGHT_PLAN) {
       if (event.type.startsWith("convergence") || event.type.startsWith("pool")) return;
       if (event.type === "state.dispatching" || event.type === "state.converging" || event.type === "state.validating") return;
-    }
-
-    // Mode 2: compact status summaries only (no detailed sub-agent events)
-    if (mode === ExecutionModes.PARALLEL_DISPATCH) {
-      if (event.type.startsWith("pool.heartbeat")) return;
-      if (event.type === "convergence.start" || event.type === "convergence.complete") {
-        // Allow these but only as compact summaries
-      }
     }
 
     for (const listener of this.eventListeners) {

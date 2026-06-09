@@ -18,6 +18,9 @@ import {
   handleExitCommand,
   handleVersionCommand,
 } from "./core.js";
+import {
+  handleModeCommand,
+} from "./agent.js";
 
 // =========================================================================
 // Re-exports
@@ -28,6 +31,7 @@ export * from "./parse.js";
 export * from "./registry.js";
 export * from "./resolve.js";
 export * from "./core.js";
+export * from "./agent.js";
 
 // =========================================================================
 // Dispatch — main entry point
@@ -115,11 +119,10 @@ async function handleBuiltInSlashCommand(
       handleVersionCommand(host, args);
       return;
 
-    // ── Category 2-7: Stubs for future implementation ─────────────────
-    // These will be implemented in subsequent phases.
-
-    // Category 2: Agent
+    // ── Category 2: Agent & Orchestration ─────────────────────────────
     case "mode":
+      handleModeCommand(host, args);
+      return;
     case "plan":
     case "agent":
     case "rewind":

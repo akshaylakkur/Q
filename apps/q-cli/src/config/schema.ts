@@ -161,11 +161,11 @@ export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 
 export const DefaultExecutionModeSchema = z.enum([
   "auto",
-  "direct",
-  "lightweight_plan",
-  "parallel_dispatch",
-  "orchestrated_campaign",
-  "campaign_continuous",
+  "lightweight",
+  "speed_campaign",
+  "medium_campaign",
+  "high_campaign",
+  "modus_maximus",
 ]);
 
 export const OrchestratorInnerSchema = z.object({

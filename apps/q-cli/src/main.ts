@@ -301,6 +301,12 @@ async function startTuiSession(
     planMode: opts.plan ?? false,
     yolo: opts.yolo ?? false,
     auto: opts.auto ?? false,
+    orchestrator: {
+      setCurrentMode: (mode: string) => {
+        orch.currentMode = mode as any;
+      },
+      getCurrentMode: () => orch.currentMode ?? "not set",
+    },
   });
   tui.setOnExit(async () => {
     try { orch.cancel(); } catch { /* ignore */ }
