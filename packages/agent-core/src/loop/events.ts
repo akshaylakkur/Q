@@ -1,0 +1,205 @@
+/**
+ * Loop event types and the event dispatcher that routes
+ * recorded events to transcript persistence and live events to UI.
+ */
+
+import type { FinishReason, TokenUsage } from "@q/qprovs";
+
+import type { ToolInputDisplay } from "./display.js";
+import type { ExecutableToolResult, LoopStepStopReason, ToolUpdate } from "./types.js";
+
+export type LoopInterruptReason = "aborted" | "max_steps" | "error";
+
+export interface LoopStepBeginEvent {
+  readonly type: "step.begin";
+  readonly uuid: string;
+  readonly turnId: string;
+  readonly step: number;
+}
+
+export interface LoopStepEndEvent {
+  readonly type: "step.end";
+  readonly uuid: string;
+  readonly turnId: string;
+  readonly step: number;
+  readonly usage?: TokenUsage | undefined;
+  readonly finishReason?: LoopStepStopReason | undefined;
+  readonly llmFirstTokenLatencyMs?: number | undefined;
+  readonly llmStreamDurationMs?: number | undefined;
+  readonly providerFinishReason?: FinishReason | undefined;
+  readonly rawFinishReason?: string | undefined;
+}
+
+export interface LoopStepRetryingEvent {
+  readonly type: "step.retrying";
+  readonly turnId: string;
+  readonly step: number;
+  readonly stepUuid: string;
+  readonly failedAttempt: number;
+  readonly nextAttempt: number;
+  readonly maxAttempts: number;
+  readonly delayMs: number;
+  readonly errorName: string;
+  readonly errorMessage: string;
+  readonly statusCode?: number;
+}
+
+export interface LoopContentPartEvent {
+  readonly type: "content.part";
+  readonly uuid: string;
+  readonly turnId: string;
+  readonly step: number;
+  readonly stepUuid: string;
+  readonly part: { type: "text"; text: string } | { type: "think"; text: string };
+}
+
+export interface LoopToolCallEvent {
+  readonly type: "tool.call";
+  readonly uuid: string;
+  readonly turnId: string;
+  readonly step: number;
+  readonly stepUuid: string;
+  readonly toolCallId: string;
+  readonly name: string;
+  readonly args: unknown;
+  readonly description?: string | undefined;
+  readonly display?: ToolInputDisplay | undefined;
+}
+
+export interface LoopToolResultEvent {
+  readonly type: "tool.result";
+  readonly parentUuid: string;
+  readonly toolCallId: string;
+  readonly result: ExecutableToolResult;
+}
+
+/**
+ * Carries the assistant's response so it can be persisted to context memory.
+ * Supports both text-only responses and tool-call responses.
+ * Without this, the model's decisions and text output are lost between steps,
+ * causing models (especially non-Anthropic ones) to lose continuity.
+ */
+export interface LoopAssistantMessageEvent {
+  readonly type: "assistant.message";
+  readonly uuid: string;
+  readonly turnId: string;
+  readonly content: string;
+  readonly toolCalls: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly arguments: string;
+  }>;
+}
+
+export interface LoopTurnInterruptedEvent {
+  readonly type: "turn.interrupted";
+  readonly reason: LoopInterruptReason;
+  readonly attemptedSteps: number;
+  readonly activeStep?: number | undefined;
+  readonly message?: string | undefined;
+}
+
+export interface LoopTextDeltaEvent {
+  readonly type: "text.delta";
+  readonly delta: string;
+}
+
+export interface LoopThinkingDeltaEvent {
+  readonly type: "thinking.delta";
+  readonly delta: string;
+}
+
+export interface LoopToolCallDeltaEvent {
+  readonly type: "tool.call.delta";
+  readonly toolCallId: string;
+  readonly name?: string | undefined;
+  readonly argumentsPart?: string | undefined;
+}
+
+export interface LoopToolProgressEvent {
+  readonly type: "tool.progress";
+  readonly toolCallId: string;
+  readonly update: ToolUpdate;
+}
+
+export type LoopRecordedEvent =
+  | LoopStepBeginEvent
+  | LoopStepEndEvent
+  | LoopContentPartEvent
+  | LoopToolCallEvent
+  | LoopToolResultEvent
+  | LoopAssistantMessageEvent;
+
+export type LoopLiveOnlyEvent =
+  | LoopTurnInterruptedEvent
+  | LoopStepRetryingEvent
+  | LoopTextDeltaEvent
+  | LoopThinkingDeltaEvent
+  | LoopToolCallDeltaEvent
+  | LoopToolProgressEvent;
+
+export type LoopEvent = LoopRecordedEvent | LoopLiveOnlyEvent;
+export type LoopLiveEventEmitter = (event: LoopEvent) => void;
+
+export type LoopEventDispatcher = {
+  (event: LoopRecordedEvent): Promise<void>;
+  (event: LoopLiveOnlyEvent): void;
+};
+
+export interface CreateLoopEventDispatcherInput {
+  readonly appendTranscriptRecord: (record: LoopRecordedEvent) => Promise<void>;
+  readonly emitLiveEvent?: LoopLiveEventEmitter | undefined;
+}
+
+export function createLoopEventDispatcher(
+  input: CreateLoopEventDispatcherInput,
+): LoopEventDispatcher {
+  function dispatchEvent(event: LoopRecordedEvent): Promise<void>;
+  function dispatchEvent(event: LoopLiveOnlyEvent): void;
+  function dispatchEvent(event: LoopEvent): Promise<void> | void {
+    if (isRecordedEvent(event)) {
+      return recordEvent(input, event);
+    }
+    safeEmitLive(input.emitLiveEvent, event);
+  }
+  return dispatchEvent as LoopEventDispatcher;
+}
+
+function isRecordedEvent(event: LoopEvent): event is LoopRecordedEvent {
+  return (
+    event.type === "step.begin" ||
+    event.type === "step.end" ||
+    event.type === "content.part" ||
+    event.type === "tool.call" ||
+    event.type === "tool.result" ||
+    event.type === "assistant.message"
+  );
+}
+
+async function recordEvent(
+  input: CreateLoopEventDispatcherInput,
+  event: LoopRecordedEvent,
+): Promise<void> {
+  await input.appendTranscriptRecord(event);
+  safeEmitLive(input.emitLiveEvent, event);
+}
+
+function safeEmitLive(emit: LoopLiveEventEmitter | undefined, event: LoopEvent): void {
+  if (emit === undefined) return;
+  let maybePromise: unknown;
+  try {
+    maybePromise = (emit as (event: LoopEvent) => unknown)(event);
+  } catch {
+    return;
+  }
+  if (
+    maybePromise !== undefined &&
+    maybePromise !== null &&
+    typeof (maybePromise as { then?: unknown }).then === "function" &&
+    typeof (maybePromise as { catch?: unknown }).catch === "function"
+  ) {
+    (maybePromise as Promise<unknown>).catch(() => {
+      // Live listeners are best-effort; failures must not affect the turn.
+    });
+  }
+}

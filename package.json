@@ -1,0 +1,25 @@
+{
+  "name": "q-cli-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Qode — Autonomous Coding Agent",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm --filter q-cli build",
+    "build:packages": "pnpm --filter \"./packages/*\" build",
+    "dev": "pnpm --filter q-cli dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "oxlint .",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r clean"
+  },
+  "devDependencies": {
+    "oxlint": "^0.16.0",
+    "tsdown": "^0.22.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.0"
+  }
+}
