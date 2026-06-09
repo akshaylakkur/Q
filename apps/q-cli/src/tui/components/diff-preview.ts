@@ -6,10 +6,9 @@
  * - Header with file path and change summary (+N / -M)
  * - Color-coded diff lines (green additions, red deletions)
  * - Line numbers in gutter
- * - Smart windowing: when the diff is large, the view is centered around
- *   the change regions (additions/deletions), not the start of the file.
- *   Buffer context lines are shown before/after each change for position
- *   awareness. Omitted sections are marked with "...".
+ * - THE FULL DIFF is always shown regardless of size.
+ *   No windowing, no truncation — the complete diff is rendered
+ *   so users can see every changed line in context.
  */
 
 import type { Component } from "@earendil-works/pi-tui";
@@ -39,29 +38,10 @@ interface RenderedDiffLine {
 export class DiffPreviewComponent implements Component {
   private data: DiffData;
   private colors: ColorPalette;
-  private expanded: boolean = false;
-  /**
-   * Maximum lines to render when collapsed.
-   * When the diff is larger than this, we window around the change regions.
-   */
-  private maxVisibleLines: number = 20;
-  /**
-   * Number of context (unchanged) lines to show as buffer around each change region
-   * so the user can see where the change happens relative to the surrounding code.
-   */
-  private contextBufferLines: number = 3;
-  /**
-   * Line used as a separator marker when content is omitted.
-   */
-  private omitMarker: string = "~";
 
   constructor(data: DiffData, colors: ColorPalette) {
     this.data = data;
     this.colors = colors;
-  }
-
-  setExpanded(expanded: boolean): void {
-    this.expanded = expanded;
   }
 
   setData(data: DiffData): void {
@@ -110,12 +90,12 @@ export class DiffPreviewComponent implements Component {
       ),
     );
 
-    // Determine which lines to show — either full diff (expanded) or windowed around changes
-    const shownLines = this.expanded
-      ? diffLines_
-      : this.windowAroundChanges(diffLines_);
+    // ── ALWAYS show the full diff ────────────────────────────────────
+    // No windowing, no max-lines truncation. The complete diff is rendered
+    // so users see every change in full context, regardless of size.
+    const shownLines = diffLines_;
 
-    // Line number gutter width — compute from the shown lines (or full set for consistency)
+    // Line number gutter width — compute from the full set
     const maxLineNum = diffLines_.reduce(
       (max, dl) => Math.max(max, dl.oldLineNum || dl.newLineNum || 0),
       0,
@@ -124,13 +104,6 @@ export class DiffPreviewComponent implements Component {
 
     // Render diff lines
     for (const dl of shownLines) {
-      // Handle omit markers
-      if (dl.kind === "context" && dl.text === this.omitMarker) {
-        const omitLine = `${indent}${chalk.hex(this.colors.textDim)(this.omitMarker.repeat(Math.min(gutterWidth * 2 + 6, innerWidth - 4)))}`;
-        lines.push(truncateToWidth(omitLine, width, "…"));
-        continue;
-      }
-
       const gutter = this.renderGutter(dl, gutterWidth);
       const maxContentWidth = Math.max(1, width - visibleWidth(indent) - visibleWidth(gutter) - 1);
       const content = this.renderContent(dl, maxContentWidth);
@@ -143,207 +116,18 @@ export class DiffPreviewComponent implements Component {
       }
     }
 
-    // Show expand hint if collapsed and there's more content
-    if (!this.expanded && totalLines > this.maxVisibleLines) {
-      lines.push(
-        truncateToWidth(
-          `${indent}${chalk.hex(this.colors.textDim)(`... ${totalLines - this.maxVisibleLines} more lines in full diff (Ctrl+O to expand)`)}`,
-          width,
-          "…",
-        ),
-      );
-    }
+    lines.push(
+      truncateToWidth(
+        `${indent}${chalk.hex(this.colors.textDim)(`${totalLines} lines in diff`)}`,
+        width,
+        "…",
+      ),
+    );
 
     return lines;
   }
 
-  /**
-   * Windows the diff lines around the actual change regions (additions/deletions).
-   * Instead of showing the first N lines (which may be all context from the top of the file),
-   * this method:
-   * 1. Identifies all contiguous change regions (groups of add/delete lines).
-   * 2. For each region, includes a buffer of context lines before and after.
-   * 3. Omits large runs of pure context lines with a "~" separator.
-   * 4. Ensures the total doesn't exceed maxVisibleLines.
-   */
-  private windowAroundChanges(allLines: RenderedDiffLine[]): RenderedDiffLine[] {
-    // If the diff fits entirely within maxVisibleLines, show everything
-    if (allLines.length <= this.maxVisibleLines) {
-      return allLines;
-    }
-
-    // If there are no changes at all (unlikely), just show the first maxVisibleLines
-    const changeIndices: number[] = [];
-    for (let idx = 0; idx < allLines.length; idx++) {
-      const line = allLines[idx];
-      if (line && line.kind !== "context") {
-        changeIndices.push(idx);
-      }
-    }
-
-    if (changeIndices.length === 0) {
-      return allLines.slice(0, this.maxVisibleLines);
-    }
-
-    // Build a list of "windows" — each window is a change region plus surrounding context.
-    // A change region is a contiguous block of non-context lines.
-    const windows: { start: number; end: number }[] = [];
-    let regionStart: number = changeIndices[0] as number;
-
-    for (let i = 1; i <= changeIndices.length; i++) {
-      const currIdx = changeIndices[i];
-      const prevIdx = changeIndices[i - 1] as number;
-
-      if (currIdx !== undefined && currIdx - prevIdx === 1) {
-        // Contiguous, keep extending the region
-        continue;
-      }
-
-      // Region ended at prevIdx
-      const regionEnd = prevIdx;
-
-      // Add buffer context lines before and after
-      const winStart = Math.max(0, regionStart - this.contextBufferLines);
-      const winEnd = Math.min(allLines.length - 1, regionEnd + this.contextBufferLines);
-
-      // Merge with previous window if they overlap or nearly touch
-      if (windows.length > 0) {
-        const lastWin = windows[windows.length - 1] as { start: number; end: number };
-        if (winStart - lastWin.end <= this.contextBufferLines + 1) {
-          // Merge windows
-          lastWin.end = winEnd;
-        } else {
-          windows.push({ start: winStart, end: winEnd });
-        }
-      } else {
-        windows.push({ start: winStart, end: winEnd });
-      }
-
-      // Start new region
-      if (currIdx !== undefined) {
-        regionStart = currIdx;
-      }
-    }
-
-    // Assemble the final result from the windows, with omission markers between them
-    const result: RenderedDiffLine[] = [];
-    let previousEnd = -1;
-
-    for (const win of windows) {
-      // If there's a gap between the previous window and this one, add an omission marker
-      if (previousEnd >= 0 && win.start > previousEnd + 1) {
-        result.push({
-          kind: "context",
-          oldLineNum: 0,
-          newLineNum: 0,
-          text: this.omitMarker,
-        });
-      }
-
-      // Add the window lines (already includes context buffer)
-      for (let i = win.start; i <= win.end; i++) {
-        const line = allLines[i];
-        if (line) {
-          result.push(line);
-        }
-      }
-
-      previousEnd = win.end;
-    }
-
-    // Add leading omission if the first window doesn't start at the beginning
-    const firstWin = windows[0];
-    if (firstWin && firstWin.start > 0) {
-      result.unshift({
-        kind: "context",
-        oldLineNum: 0,
-        newLineNum: 0,
-        text: this.omitMarker,
-      });
-    }
-
-    // Add trailing omission if the last window doesn't end at the end
-    const lastWin = windows[windows.length - 1];
-    if (lastWin && lastWin.end < allLines.length - 1) {
-      result.push({
-        kind: "context",
-        oldLineNum: 0,
-        newLineNum: 0,
-        text: this.omitMarker,
-      });
-    }
-
-    // If the result still exceeds maxVisibleLines, we need to aggressively trim.
-    // This can happen if there are many scattered changes with buffer context.
-    if (result.length > this.maxVisibleLines) {
-      return this.trimToFit(result, this.maxVisibleLines);
-    }
-
-    return result;
-  }
-
-  /**
-   * Trims the windowed result to fit within `maxLines`.
-   * Prioritizes showing change lines (adds/deletes) over context,
-   * and reduces context buffer lines symmetrically.
-   */
-  private trimToFit(lines: RenderedDiffLine[], maxLines: number): RenderedDiffLine[] {
-    if (lines.length <= maxLines) return lines;
-
-    // Strategy: remove context lines from the edges of each contiguous block,
-    // preferring to keep the change regions visible.
-    // We iterate, trimming context from borders until we fit.
-
-    const trimmed: RenderedDiffLine[] = [...lines];
-
-    while (trimmed.length > maxLines) {
-      // Find all contiguous blocks and trim one context line from the
-      // longest run of context that borders a change or an omit marker.
-      let bestRunStart = -1;
-      let bestRunLen = 0;
-
-      let runStart = -1;
-      for (let i = 0; i < trimmed.length; i++) {
-        const dl = trimmed[i] as RenderedDiffLine;
-        if (dl.kind === "context" && dl.text !== this.omitMarker) {
-          if (runStart === -1) runStart = i;
-        } else {
-          if (runStart !== -1) {
-            const runLen = i - runStart;
-            if (runLen > bestRunLen) {
-              bestRunLen = runLen;
-              bestRunStart = runStart;
-            }
-            runStart = -1;
-          }
-        }
-      }
-      // Check trailing run
-      if (runStart !== -1) {
-        const runLen = trimmed.length - runStart;
-        if (runLen > bestRunLen) {
-          bestRunLen = runLen;
-          bestRunStart = runStart;
-        }
-      }
-
-      if (bestRunStart >= 0 && bestRunLen > 0) {
-        // Remove the first line of the longest context run
-        trimmed.splice(bestRunStart, 1);
-      } else {
-        // No context runs left to trim — just truncate from the end
-        return trimmed.slice(0, maxLines);
-      }
-    }
-
-    return trimmed;
-  }
-
   private renderGutter(line: RenderedDiffLine, width: number): string {
-    if (line.text === this.omitMarker) {
-      return chalk.hex(this.colors.diffGutter)(" ".repeat(width * 2 + 1));
-    }
-
     const oldStr =
       line.kind === "delete" || line.kind === "context"
         ? String(line.oldLineNum || "")
@@ -360,10 +144,6 @@ export class DiffPreviewComponent implements Component {
   }
 
   private renderContent(line: RenderedDiffLine, maxWidth: number): string {
-    if (line.text === this.omitMarker) {
-      return "";
-    }
-
     const marker = line.kind === "add" ? "+" : line.kind === "delete" ? "-" : " ";
     let styled: string;
 

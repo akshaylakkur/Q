@@ -287,9 +287,39 @@ export class QTui {
         return { consume: true };
       }
 
+      // Ctrl+C — if there is text in the input bar, clear it
+      if (matchesKey(data, "ctrl+c")) {
+        const currentText = this.editor.getText();
+        if (currentText.trim().length > 0) {
+          this.editor.setText("");
+          this.editor.borderColor = (s: string) =>
+            chalk.hex(this.colors.border)(s);
+          this.ui.requestRender();
+          return { consume: true };
+        }
+        // If no text, let the default behavior pass through (e.g. SIGINT)
+        return undefined;
+      }
+
+      // Ctrl+Q — equivalent to /exit, quits the TUI gracefully
+      if (matchesKey(data, "ctrl+q")) {
+        // Run exit asynchronously without blocking the input listener
+        void this.handleExitCommand();
+        return { consume: true };
+      }
+
       // Let other input pass through
       return undefined;
     });
+  }
+
+  /**
+   * Gracefully exit the TUI — equivalent to the /exit command.
+   */
+  private async handleExitCommand(): Promise<void> {
+    this.showStatus("Goodbye!");
+    await new Promise((r) => setTimeout(r, 100));
+    await this.stop(0);
   }
 
   // ── Autocomplete Setup ─────────────────────────────────────────────

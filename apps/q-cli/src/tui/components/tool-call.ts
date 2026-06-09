@@ -44,7 +44,6 @@ export class ToolCallComponent implements Component {
       const diffData = this.buildDiffData();
       if (diffData) {
         this.diffComponent = new DiffPreviewComponent(diffData, this.colors);
-        if (this.expanded) this.diffComponent.setExpanded(true);
       }
     }
   }
