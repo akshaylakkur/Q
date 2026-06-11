@@ -51,6 +51,8 @@ import { StatusDashboardComponent } from "./components/status-dashboard.js";
 
 // ── Slash command system ────────────────────────────────────────────
 import { dispatchInput, ALL_SLASH_COMMANDS, sortSlashCommands, type SlashCommandHost, type QSlashCommand } from "./commands/index.js";
+import { ConfirmationDropdownComponent } from "./components/confirmation-dropdown.js";
+import { RevisionInputComponent } from "./components/revision-input.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -113,12 +115,24 @@ export class QTui {
   private turnCount: number = 0;
 
   // Dialog management
-  private activeDialog: "help" | "status" | null = null;
+  private activeDialog: "help" | "status" | "confirmation" | "revision" | null = null;
   private dialogComponent: (Container & import("@earendil-works/pi-tui").Focusable) | null = null;
   private savedEditorContent: string = "";
 
+  // Modus Maximus state
+  private modusMaximusCurrentStepIndex: number = -1;
+  private modusMaximusPlanStatus: StatusMessageComponent | null = null;
+  private modusMaximusStepCount: number = 0;
+  private modusMaximusPlanContent: string = "";
+
   // Orchestrator reference
-  private orchestratorHost?: { setCurrentMode(mode: string): void; getCurrentMode(): string };
+  private orchestratorHost?: {
+    setCurrentMode(mode: string): void;
+    getCurrentMode(): string;
+    resolveModusMaximusConfirmation?(response: { choice: "looks-good" | "needs-revision" | "redo"; revisionText?: string }): void;
+    submitPrompt?(prompt: string): Promise<import("../orchestrator/modes/types.js").ExecutionResult>;
+    cancel?(): void;
+  };
 
   // Event handlers
   private onExit?: () => Promise<void>;
@@ -150,6 +164,7 @@ export class QTui {
       isCompacting: false,
       isReplaying: false,
       executionMode: "not set",
+      modusMaximusPhase: "idle",
     };
 
     // Create terminal
@@ -267,9 +282,27 @@ export class QTui {
 
   private registerGlobalShortcuts(): void {
     this.disposeInputListener = this.ui.addInputListener((data) => {
-      // If we have an active dialog, let it handle input first
-      if (this.activeDialog !== null) {
-        return undefined; // dialog handles its own input
+      // ── If a dialog is active, route input directly to it ─────────
+      // We consume the event here rather than relying on pi-tui's focus
+      // routing, which can be unreliable for custom Focusable components
+      // mounted as editor replacements.
+      if (this.activeDialog === "confirmation" || this.activeDialog === "revision") {
+        // Allow Ctrl+Q (exit), Ctrl+C (interrupt with empty input) through
+        if (matchesKey(data, "ctrl+q")) {
+          void this.handleExitCommand();
+          return { consume: true };
+        }
+
+        const dd = this.dialogComponent as any;
+        if (dd && typeof dd.handleInput === "function") {
+          dd.handleInput(data);
+          this.ui.requestRender();
+        }
+        return { consume: true };
+      }
+      if (this.activeDialog === "help" || this.activeDialog === "status") {
+        // Existing dialogs handle their own input via pi-tui focus routing
+        return undefined;
       }
 
       // Ctrl+I — expand/collapse the thinking section
@@ -350,8 +383,8 @@ export class QTui {
    * Mount a dialog component as a replacement for the editor.
    * The dialog takes over the editor container and captures focus.
    */
-  private mountDialog(component: Container & import("@earendil-works/pi-tui").Focusable): void {
-    this.activeDialog = "help"; // will be updated by caller
+  private mountDialog(component: Container & import("@earendil-works/pi-tui").Focusable, dialogType?: string): void {
+    this.activeDialog = (dialogType as any) ?? "help";
     this.dialogComponent = component;
 
     // Save editor state
@@ -552,6 +585,34 @@ export class QTui {
       case "error":
         this.showError(event.message ?? "Unknown error");
         break;
+
+      // ── Modus Maximus Events ───────────────────────────────────────
+      case "modus-maximus.plan.started":
+        this.handleModusMaximusPlanStarted(event);
+        break;
+      case "modus-maximus.plan.completed":
+        this.handleModusMaximusPlanCompleted(event);
+        break;
+      case "modus-maximus.confirmation.request":
+        this.handleModusMaximusConfirmationRequest(event);
+        break;
+      case "modus-maximus.step.started":
+        this.handleModusMaximusStepStarted(event);
+        break;
+      case "modus-maximus.step.completed":
+        this.handleModusMaximusStepCompleted(event);
+        break;
+      case "modus-maximus.step.failed":
+        this.handleModusMaximusStepFailed(event);
+        break;
+      case "modus-maximus.summary":
+        this.handleModusMaximusSummary(event);
+        break;
+
+      // ── Sub-agent streaming events ──────────────────────────────────
+      case "subagent.event":
+        this.handleSubagentEvent(event);
+        break;
     }
   }
 
@@ -582,25 +643,32 @@ export class QTui {
   }
 
   private handleTurnEnded(_event: AgentEvent): void {
-    this.isProcessing = false;
+    // ── Modus Maximus guard ───────────────────────────────────────────
+    // When modus-maximus mode is active, the turn.ended event fires when
+    // plan generation finishes (Phase 1). But Phases 2-4 are still running
+    // within the same orchestrator submitPrompt() call. Do NOT reset
+    // isProcessing since the outer sendToAgent manages that lifecycle.
+    // We DO need to end streaming to stop the flush timer, and we DO need
+    // to stop context polling since plan output was already streamed.
+    const isModusMaximus = this.appState.executionMode === "modus-maximus";
+    if (!isModusMaximus) {
+      this.isProcessing = false;
+    }
     this.appState.streamingPhase = "idle";
 
     // Stop context polling
     this.stopContextPolling();
 
-    // Finalize streaming — flushes all remaining buffers
+    // Finalize streaming — flushes all remaining buffers, stops timer
     this.streaming.endTurn();
 
-    // ── Fallback: If streaming didn't deliver any visible content,
-    // poll the context for the last assistant message(s) and render them.
-    //
-    // We check hasDeliveredContent (not isActive()) because after endTurn()
-    // isActive() always returns false, but we need to know if content was
-    // actually flushed during the turn.
-    const streamingDelivered = this.streaming.hasDeliveredContent;
-
-    if (!streamingDelivered) {
-      this.renderMissedContextMessages();
+    // ── Fallback: only render missed context if NOT modus-maximus
+    // (plan output was streamed directly via assistant.delta events)
+    if (!isModusMaximus) {
+      const streamingDelivered = this.streaming.hasDeliveredContent;
+      if (!streamingDelivered) {
+        this.renderMissedContextMessages();
+      }
     }
 
     this.ui.requestRender();
@@ -863,30 +931,55 @@ export class QTui {
     this.transcriptContainer.addChild(userMsg);
     this.ui.requestRender();
 
-    // Create abort controller for this turn
+    // ── Route through orchestrator for mode-aware execution ──────────
+    // When modus-maximus mode is active, the orchestrator handles the
+    // full pipeline (plan generation, confirmation, sub-agent execution).
+    // The plan generation streams via normal agent events (turn.started,
+    // assistant.delta, turn.ended) so the streaming controller is managed
+    // by the existing handleTurnStarted/handleTurnEnded handlers.
+    const isModusMaximus = this.appState.executionMode === "modus-maximus";
+    if (isModusMaximus && this.orchestratorHost?.submitPrompt) {
+      this.isProcessing = true;
+
+      try {
+        const result = await this.orchestratorHost.submitPrompt(text);
+
+        // Check if streaming delivered the summary or if we need a fallback
+        const streamingDelivered = this.streaming.hasDeliveredContent;
+        if (!streamingDelivered && result.output) {
+          const summaryComp = new AssistantMessageComponent(this.colors);
+          summaryComp.setContent(result.output);
+          this.transcriptContainer.addChild(summaryComp);
+        }
+
+        if (!result.success && result.error) {
+          this.showError(`Modus Maximus error: ${result.error}`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.showError(`Modus Maximus error: ${msg}`);
+      } finally {
+        this.isProcessing = false;
+      }
+      return;
+    }
+
+    // ── Standard direct agent execution ───────────────────────────────
     this.abortController = new AbortController();
 
     try {
-      // Launch the turn
       const turnId = this.agent.turn.prompt(text);
       if (turnId === null) {
-        this.showError(
-          "Could not launch turn (another turn is active)",
-        );
+        this.showError("Could not launch turn (another turn is active)");
         this.isProcessing = false;
         return;
       }
-
-      // Wait for completion
-      await this.agent.turn.waitForCurrentTurn(
-        this.abortController.signal,
-      );
+      await this.agent.turn.waitForCurrentTurn(this.abortController.signal);
     } catch (err) {
       if (this.abortController?.signal.aborted) {
         this.showStatus("Cancelled");
       } else {
-        const msg =
-          err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? err.message : String(err);
         this.showError(`Error: ${msg}`);
       }
     } finally {
@@ -896,6 +989,17 @@ export class QTui {
   }
 
   cancelCurrentTurn(): void {
+    // During modus-maximus, cancel via the orchestrator
+    if (this.appState.executionMode === "modus-maximus") {
+      this.showStatus("Cancelling Modus Maximus...");
+      if (this.orchestratorHost?.cancel) {
+        this.orchestratorHost.cancel();
+      } else if (this.abortController) {
+        this.abortController.abort();
+      }
+      return;
+    }
+
     if (this.abortController) {
       this.abortController.abort();
       this.showStatus("Cancelling...");
@@ -954,6 +1058,307 @@ export class QTui {
     );
     this.transcriptContainer.addChild(component);
     this.ui.requestRender();
+  }
+
+  // ── Modus Maximus Handlers ─────────────────────────────────────────
+
+  /**
+   * Handle plan.started event — show a status message.
+   */
+  private handleModusMaximusPlanStarted(_event: AgentEvent): void {
+    this.appState.modusMaximusPhase = "planning";
+
+    const status = new StatusMessageComponent(
+      "📋 Generating Modus Maximus plan...",
+      this.colors,
+      "info",
+    );
+    this.transcriptContainer.addChild(status);
+    this.modusMaximusPlanStatus = status;
+    this.ui.requestRender();
+  }
+
+  /**
+   * Handle plan.completed event — show plan stats and trigger confirmation.
+   */
+  private handleModusMaximusPlanCompleted(event: AgentEvent): void {
+    this.appState.modusMaximusPhase = "confirming";
+    this.modusMaximusStepCount = event.stepCount ?? 0;
+    this.modusMaximusPlanContent = event.planContent ?? "";
+
+    // Replace plan status with completion message
+    if (this.modusMaximusPlanStatus) {
+      // Already shown; just update
+    }
+
+    const status = new StatusMessageComponent(
+      `✅ Plan generated — ${this.modusMaximusStepCount} steps`,
+      this.colors,
+      "success",
+      event.planFilePath ?? "",
+    );
+    this.transcriptContainer.addChild(status);
+    this.ui.requestRender();
+  }
+
+  /**
+   * Handle confirmation.request event — show confirmation dropdown.
+   */
+  private handleModusMaximusConfirmationRequest(_event: AgentEvent): void {
+    this.appState.modusMaximusPhase = "confirming";
+
+    // Show the confirmation dropdown as a dialog
+    const dropdown = new ConfirmationDropdownComponent(this.colors);
+    dropdown.setStepCount(this.modusMaximusStepCount);
+
+    dropdown.setOnChoice((choice) => {
+      if (choice === "needs-revision") {
+        // Transition to revision input
+        this.restoreEditor();
+        this.showRevisionInput();
+      } else {
+        // Looks good or Redo — resolve the confirmation
+        this.restoreEditor();
+        if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
+          this.orchestratorHost.resolveModusMaximusConfirmation({ choice });
+        }
+      }
+    });
+
+    dropdown.setOnCancel(() => {
+      // Cancel = choose Redo
+      this.restoreEditor();
+      if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
+        this.orchestratorHost.resolveModusMaximusConfirmation({ choice: "redo" });
+      }
+    });
+
+    this.mountDialog(dropdown, "confirmation");
+  }
+
+  /**
+   * Show the revision text input dialog.
+   */
+  private showRevisionInput(): void {
+    const revisionInput = new RevisionInputComponent(this.colors);
+
+    revisionInput.setOnSubmit((text) => {
+      this.restoreEditor();
+      if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
+        this.orchestratorHost.resolveModusMaximusConfirmation({
+          choice: "needs-revision",
+          revisionText: text,
+        });
+      }
+    });
+
+    revisionInput.setOnCancel(() => {
+      // Cancel revision → go back to confirmation dropdown
+      this.restoreEditor();
+      this.handleModusMaximusConfirmationRequest({
+        type: "modus-maximus.confirmation.request",
+      });
+    });
+
+    this.mountDialog(revisionInput, "revision");
+  }
+
+  /**
+   * Handle step.started event — begin a streaming turn for the step.
+   * Shows the step instructions as a status message, then starts a new
+   * streaming "turn" that uses the exact same pipeline as the main agent
+   * (streaming controller + tool call components + thinking section).
+   * The only difference is the agent label becomes "step-XXX".
+   */
+  private handleModusMaximusStepStarted(event: AgentEvent): void {
+    this.appState.modusMaximusPhase = "executing";
+
+    const stepIndex = event.stepIndex ?? 0;
+    const stepTitle = event.stepTitle ?? "";
+    const instructions = event.instructions ?? "";
+
+    this.modusMaximusCurrentStepIndex = stepIndex;
+
+    // Show step header as a status message
+    const stepLabel = `step-${String(stepIndex).padStart(3, "0")}`;
+    const header = stepTitle
+      ? `Step ${stepIndex}: ${stepTitle}`
+      : `Step ${stepIndex}`;
+    const status = new StatusMessageComponent(header, this.colors, "info");
+    this.transcriptContainer.addChild(status);
+
+    // Show the instructions as a user-like message
+    if (instructions.trim()) {
+      // We use a styled text block to show the instructions
+      const instructionsStatus = new StatusMessageComponent(
+        instructions.trim().slice(0, 200) + (instructions.trim().length > 200 ? "…" : ""),
+        this.colors,
+        "info",
+      );
+      this.transcriptContainer.addChild(instructionsStatus);
+    }
+
+    // Start a streaming "turn" with the step label so all subsequent
+    // text.delta, thinking.delta, tool.call.* events flow through the
+    // exact same streaming pipeline as the main agent.
+    this.streaming.beginTurn(stepLabel);
+
+    this.ui.requestRender();
+  }
+
+  /**
+   * Handle step.completed event — end the streaming turn, mark completed.
+   */
+  private handleModusMaximusStepCompleted(event: AgentEvent): void {
+    const stepIndex = event.stepIndex ?? 0;
+
+    // End the streaming turn for this step — flushes buffers, collapses thinking
+    this.streaming.endTurn();
+
+    // Reset streaming state so subsequent steps start fresh
+    this.streaming.reset();
+
+    const status = new StatusMessageComponent(
+      `✅ Step ${stepIndex} completed`,
+      this.colors,
+      "success",
+    );
+    this.transcriptContainer.addChild(status);
+    this.ui.requestRender();
+  }
+
+  /**
+   * Handle step.failed event — end the streaming turn, show error.
+   */
+  private handleModusMaximusStepFailed(event: AgentEvent): void {
+    const stepIndex = event.stepIndex ?? 0;
+
+    // End the streaming turn for this step
+    this.streaming.endTurn();
+    this.streaming.reset();
+
+    const errorMsg = event.error ?? "unknown error";
+    const status = new StatusMessageComponent(
+      `❌ Step ${stepIndex} failed — ${errorMsg}`,
+      this.colors,
+      "error",
+    );
+    this.transcriptContainer.addChild(status);
+    this.ui.requestRender();
+  }
+
+  /**
+   * Handle summary event — final project summary.
+   */
+  private handleModusMaximusSummary(event: AgentEvent): void {
+    this.appState.modusMaximusPhase = "summarizing";
+
+    const summaryText = event.summary ?? "Modus Maximus execution complete.";
+
+    // Show final summary as assistant message
+    const summaryComponent = new AssistantMessageComponent(this.colors);
+    summaryComponent.setContent(summaryText);
+    this.transcriptContainer.addChild(summaryComponent);
+
+    // Show completion status
+    const status = new StatusMessageComponent(
+      `🏆 Modus Maximus complete: ${event.completedSteps ?? 0}/${event.totalSteps ?? 0} steps succeeded`,
+      this.colors,
+      "success",
+    );
+    this.transcriptContainer.addChild(status);
+
+    this.ui.requestRender();
+  }
+
+  /**
+   * Handle sub-agent streaming events during modus-maximus execution.
+   * Sub-agents emit raw LoopEvents wrapped in "subagent.event" type.
+   * We map each raw LoopEvent type to the same format as the main agent's
+   * event stream and call the exact same handlers, so the pipeline
+   * (streaming controller → tool call components → thinking section)
+   * is identical. The only difference is the label becomes "step-XXX".
+   */
+  private handleSubagentEvent(event: AgentEvent): void {
+    // The inner event is nested in the "event" field
+    const innerEvent = (event as any).event as Record<string, unknown> | undefined;
+    if (!innerEvent || typeof innerEvent !== "object") return;
+
+    const innerType = innerEvent.type as string | undefined;
+
+    // ── text.delta → handleTextDelta ──────────────────────────────────
+    if (innerType === "text.delta" && typeof innerEvent.delta === "string") {
+      this.handleTextDelta({ type: "assistant.delta", delta: innerEvent.delta } as AgentEvent);
+      return;
+    }
+
+    // ── thinking.delta → handleThinkingDelta ──────────────────────────
+    if (innerType === "thinking.delta" && typeof innerEvent.delta === "string") {
+      this.handleThinkingDelta({ type: "thinking.delta", delta: innerEvent.delta } as AgentEvent);
+      return;
+    }
+
+    // ── tool.call → handleToolCallStarted ─────────────────────────────
+    if (innerType === "tool.call" && typeof innerEvent.toolCallId === "string") {
+      this.handleToolCallStarted({
+        type: "tool.call.started",
+        toolCallId: innerEvent.toolCallId,
+        name: innerEvent.name as string,
+        args: innerEvent.args as Record<string, unknown>,
+        description: innerEvent.description as string | undefined,
+      } as AgentEvent);
+      return;
+    }
+
+    // ── tool.call.delta → handleToolCallDelta ─────────────────────────
+    if (innerType === "tool.call.delta" && typeof innerEvent.toolCallId === "string") {
+      this.handleToolCallDelta({
+        type: "tool.call.delta",
+        toolCallId: innerEvent.toolCallId,
+        argumentsPart: innerEvent.argumentsPart as string,
+      } as AgentEvent);
+      return;
+    }
+
+    // ── tool.result → handleToolResult ────────────────────────────────
+    if (innerType === "tool.result" && typeof innerEvent.toolCallId === "string") {
+      // The raw LoopToolResultEvent nests result in a `result` field
+      const rawResult = innerEvent.result as Record<string, unknown> | undefined;
+      const output = rawResult?.output ?? innerEvent.output ?? "(no output)";
+      const isError = rawResult?.isError === true;
+      this.handleToolResult({
+        type: "tool.result",
+        toolCallId: innerEvent.toolCallId,
+        output,
+        isError,
+      } as AgentEvent);
+      return;
+    }
+
+    // ── tool.progress → handleToolResult (show as output update) ──────
+    if (innerType === "tool.progress" && typeof innerEvent.toolCallId === "string") {
+      const update = innerEvent.update as { text?: string } | undefined;
+      if (update?.text) {
+        this.handleToolResult({
+          type: "tool.result",
+          toolCallId: innerEvent.toolCallId,
+          output: update.text,
+          isError: false,
+        } as AgentEvent);
+      }
+      return;
+    }
+
+    // ── content.part → compound text/think parts ─────────────────────
+    if (innerType === "content.part" && typeof innerEvent.part === "object" && innerEvent.part !== null) {
+      const part = innerEvent.part as { type?: string; text?: string };
+      if (part.type === "think" && typeof part.text === "string") {
+        this.handleThinkingDelta({ type: "thinking.delta", delta: part.text } as AgentEvent);
+      } else if (part.type === "text" && typeof part.text === "string") {
+        this.handleTextDelta({ type: "assistant.delta", delta: part.text } as AgentEvent);
+      }
+      return;
+    }
   }
 
   // ── UI Helpers ─────────────────────────────────────────────────────

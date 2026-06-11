@@ -54,5 +54,7 @@ export type { DependencyDAG, CampaignState, ExecutionMetrics, EscalationRecommen
 
 export { DirectMode } from "./direct-mode.js";
 export { LightweightPlanMode } from "./lightweight-plan-mode.js";
+export { ModusMaximusMode } from "./modus-maximus-mode.js";
+export type { ParsedStep, ConfirmationChoice, ConfirmationResponse, StepAgentExecResult } from "./modus-maximus-mode.js";
 export { DynamicReclassifier } from "./dynamic-reclassifier.js";
 export type { ReclassifierThresholds } from "./dynamic-reclassifier.js";

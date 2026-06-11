@@ -306,6 +306,15 @@ async function startTuiSession(
         orch.currentMode = mode as any;
       },
       getCurrentMode: () => orch.currentMode ?? "not set",
+      resolveModusMaximusConfirmation: (response) => {
+        orch.resolveModusMaximusConfirmation(response);
+      },
+      submitPrompt: async (prompt: string) => {
+        return orch.submitPrompt(prompt);
+      },
+      cancel: () => {
+        orch.cancel();
+      },
     },
   });
   tui.setOnExit(async () => {

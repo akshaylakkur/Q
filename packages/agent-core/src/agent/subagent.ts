@@ -349,8 +349,13 @@ export class SessionSubagentHost {
     childAgent.context.appendUserMessage(prompt);
 
     const dispatchEvent = createLoopEventDispatcher({
-      appendTranscriptRecord: async (_event: LoopRecordedEvent) => {
-        // Sub-agent events are not recorded to parent's persistence
+      appendTranscriptRecord: async (event: LoopRecordedEvent) => {
+        // Feed tool results and assistant messages back into the child
+        // agent's context memory, so subsequent loop iterations see the
+        // conversation history. Without this, the LLM sees the *same*
+        // single user prompt on every iteration and repeats its tool calls
+        // endlessly (the exact looping behavior reported in modus-maximus).
+        childAgent.context.appendLoopEvent(event);
       },
       emitLiveEvent: (_event: LoopEvent) => {
         // Emit to UI via parent

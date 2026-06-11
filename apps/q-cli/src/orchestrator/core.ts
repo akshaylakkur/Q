@@ -184,9 +184,14 @@ export class OrchestratorCore {
 
       // Determine execution mode — user-selected mode takes priority,
       // otherwise falls back to the classifier recommendation (which returns AUTO).
-      const mode: ExecutionMode = this.config.defaultMode === "auto"
-        ? classification.mode
-        : (this.config.defaultMode as ExecutionMode);
+      // Check if user explicitly set a mode via /mode command.
+      const effectiveMode: ExecutionMode = this.currentMode ?? ExecutionModes.AUTO;
+      const userSetMode = effectiveMode !== ExecutionModes.AUTO;
+      const mode: ExecutionMode = userSetMode
+        ? effectiveMode
+        : this.config.defaultMode === "auto"
+          ? classification.mode
+          : (this.config.defaultMode as ExecutionMode);
       this.currentMode = mode;
 
       // ── Step 2: Execute through the standard agentic loop.
@@ -371,6 +376,13 @@ export class OrchestratorCore {
   }
 
   /**
+   * Get the current session ID.
+   */
+  getSessionId(): string {
+    return this._sessionId;
+  }
+
+  /**
    * Cancel all active operations.
    */
   cancel(): void {
@@ -458,8 +470,19 @@ export class OrchestratorCore {
   }
 
   // =======================================================================
-  // Internal: AUTO/DIRECT/LIGHTWEIGHT_PLAN execution
+  // Internal: AUTO/DIRECT/LIGHTWEIGHT_PLAN/MODUS_MAXIMUS execution
   // =======================================================================
+
+  /** Resolve a MODUS_MAXIMUS confirmation from the TUI */
+  resolveModusMaximusConfirmation(response: import("./modes/modus-maximus-mode.js").ConfirmationResponse): void {
+    const modeHandler = this._modusMaximusHandler;
+    if (modeHandler) {
+      modeHandler.resolveConfirmation(response);
+    }
+  }
+
+  /** Get the current MODUS_MAXIMUS handler (if active) */
+  private _modusMaximusHandler: import("./modes/modus-maximus-mode.js").ModusMaximusMode | null = null;
 
   private async executeDirectOrLightweight(
     mode: ExecutionMode,
@@ -485,6 +508,16 @@ export class OrchestratorCore {
       const { DirectMode } = await import("./modes/direct-mode.js");
       const handler = new DirectMode();
       result = await handler.execute(task, this);
+    } else if (mode === ExecutionModes.MODUS_MAXIMUS) {
+      const { ModusMaximusMode } = await import("./modes/modus-maximus-mode.js");
+      const handler = new ModusMaximusMode();
+      this._modusMaximusHandler = handler;
+      this.transitionTo("dispatching");
+      try {
+        result = await handler.execute(task, this);
+      } finally {
+        this._modusMaximusHandler = null;
+      }
     } else {
       const { LightweightPlanMode } = await import("./modes/lightweight-plan-mode.js");
       const handler = new LightweightPlanMode();
@@ -943,6 +976,7 @@ note circular dependencies, and suggest boundary rules.`;
    * filtering scheme — they should always reach the TUI.
    */
   recordAgentEvent(event: unknown): void {
+    // Forward to orchestrator event listeners (TUI bridge, etc.)
     for (const listener of this.eventListeners) {
       try {
         listener(event as OrchestratorEvent);
@@ -950,6 +984,12 @@ note circular dependencies, and suggest boundary rules.`;
         // Listeners must not break the agent loop.
       }
     }
+
+    // Also forward through the root agent's RPC channel, which is already
+    // bridged to the TUI via setupAgentEventBridge(). This ensures that
+    // orchestrator-emitted events (like modus-maximus.*) reach the TUI's
+    // handleAgentEvent() method.
+    this.rootAgent?.emitEvent(event);
   }
 
   /**

@@ -27,13 +27,15 @@ export class AssistantMessageComponent implements Component {
   private markdownTheme: MarkdownTheme;
   private colors: ColorPalette;
   private kind: AssistantKind;
+  private customLabel: string | null;
   private isStreaming: boolean = false;
   private fullText: string = "";
   private contentWidth: number = 0;
 
-  constructor(colors: ColorPalette, options?: { kind?: AssistantKind }) {
+  constructor(colors: ColorPalette, options?: { kind?: AssistantKind; label?: string }) {
     this.colors = colors;
     this.kind = options?.kind ?? "assistant";
+    this.customLabel = options?.label ?? null;
     this.markdownTheme = this.createMarkdownTheme();
     this.contentContainer = new Container();
   }
@@ -162,8 +164,9 @@ export class AssistantMessageComponent implements Component {
           : "")
       );
     }
-    // Assistant
-    const label = chalk.bold.hex(this.colors.roleAssistant)("Qode Agent");
+    // Use custom label if set (e.g. "step-001"), otherwise default to "Qode Agent"
+    const labelText = this.customLabel ?? "Qode Agent";
+    const label = chalk.bold.hex(this.colors.roleAssistant)(labelText);
     if (this.isStreaming && this.fullText.trim().length > 0) {
       return label + " " + chalk.hex(this.colors.primary)("●");
     }

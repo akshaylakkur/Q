@@ -9,6 +9,7 @@
  * - All flush state properly managed so endTurn() + isActive() work correctly.
  * - Thinking content and tool calls are placed inside a ThinkingSectionComponent
  *   that collapses after the turn completes.
+ * - Supports a custom label (e.g. "step-001") for sub-agent streaming.
  */
 
 import type { Container } from "@earendil-works/pi-tui";
@@ -47,6 +48,9 @@ export class StreamingController {
   /** Tracks whether any content has been flushed this turn */
   private hasFlushedContent: boolean = false;
 
+  /** Custom label for the assistant component (e.g. "step-001") */
+  private stepLabel: string | null = null;
+
   constructor(transcriptContainer: Container, colors: ColorPalette) {
     this.transcriptContainer = transcriptContainer;
     this.colors = colors;
@@ -54,7 +58,7 @@ export class StreamingController {
 
   // ── Turn Lifecycle ──────────────────────────────────────────────────
 
-  beginTurn(): void {
+  beginTurn(label?: string): void {
     this.turnActive = true;
     this.streaming = true;
     this.hasFlushedContent = false;
@@ -64,6 +68,7 @@ export class StreamingController {
     this.textComponent = null;
     this.thinkingSection = null;
     this.thinkingComponent = null;
+    this.stepLabel = label ?? null;
 
     // Start the fixed-interval flush timer
     this.startFixedTimer();
@@ -226,7 +231,7 @@ export class StreamingController {
       if (!this.textComponent) {
         this.textComponent = new AssistantMessageComponent(
           this.colors,
-          { kind: "assistant" },
+          { kind: "assistant", label: this.stepLabel ?? undefined },
         );
         this.textComponent.setStreaming(true);
         this.transcriptContainer.addChild(this.textComponent);
@@ -267,5 +272,6 @@ export class StreamingController {
     this.turnActive = false;
     this.streaming = false;
     this.hasFlushedContent = false;
+    this.stepLabel = null;
   }
 }

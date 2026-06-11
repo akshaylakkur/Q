@@ -23,6 +23,8 @@ export interface TuiAppState {
   isReplaying: boolean;
   /** Current orchestrator execution mode (user-facing name) */
   executionMode: string;
+  /** Whether we are in modus-maximus confirmation phase */
+  modusMaximusPhase: "idle" | "planning" | "confirming" | "executing" | "summarizing";
 }
 
 // ── Transcript Entries ─────────────────────────────────────────────────
@@ -79,6 +81,29 @@ export interface FileExplorerNode {
   expanded?: boolean;
 }
 
+// ── Modus Maximus Types ─────────────────────────────────────────────
+
+export interface ModusMaximusStepInfo {
+  stepIndex: number;
+  stepTitle: string;
+  instructions: string;
+}
+
+export type ConfirmationChoice = "looks-good" | "needs-revision" | "redo";
+
+export interface ConfirmationResponse {
+  choice: ConfirmationChoice;
+  revisionText?: string;
+}
+
+export interface StepAgentResult {
+  stepIndex: number;
+  summary: string;
+  usage: { promptTokens: number; completionTokens: number };
+  success: boolean;
+  changedFiles: string[];
+}
+
 // ── Agent Events (mapped from agent-core types) ───────────────────────
 
 export interface AgentEvent {
@@ -101,6 +126,24 @@ export interface AgentEvent {
   message?: string;
   error?: string;
   origin?: string;
+
+  // Modus Maximus fields
+  planFilePath?: string;
+  stepCount?: number;
+  stepIndex?: number;
+  stepTitle?: string;
+  instructions?: string;
+  stepInfo?: ModusMaximusStepInfo;
+  totalSteps?: number;
+  completedSteps?: number;
+  failedSteps?: number;
+  summary?: string;
+  changedFiles?: string[];
+  tokenUsage?: { promptTokens: number; completionTokens: number };
+  planContent?: string;
+  choice?: ConfirmationChoice;
+  revisionText?: string;
+  sessionId?: string;
 }
 
 // ── TUI Options ────────────────────────────────────────────────────────
@@ -119,8 +162,20 @@ export interface TuiOptions {
   orchestrator?: {
     setCurrentMode(mode: string): void;
     getCurrentMode(): string;
+    resolveModusMaximusConfirmation?(response: { choice: ConfirmationChoice; revisionText?: string }): void;
+    /**
+     * Submit a prompt through the orchestrator for mode-aware execution.
+     * When in modus-maximus mode, this triggers the full pipeline.
+     * Returns the execution result.
+     */
+    submitPrompt?(prompt: string): Promise<ExecutionResult>;
+    /** Cancel the current orchestration (aborts modus-maximus pipeline) */
+    cancel?(): void;
   };
 }
+
+// Import ExecutionResult type for the orchestrator interface
+import type { ExecutionResult } from "../orchestrator/modes/types.js";
 
 // ── Theme Colors ───────────────────────────────────────────────────────
 
@@ -162,6 +217,9 @@ export interface ColorPalette {
   statusWarning: string;
   statusError: string;
 }
+
+/** Modus maximus mode constants */
+export const MODUS_MAXIMUS_DIR = ".Q/modes/modus-maximus";
 
 export const DEFAULT_COLORS: ColorPalette = {
   primary: "#06B6D4",
