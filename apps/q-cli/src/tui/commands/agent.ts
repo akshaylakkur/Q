@@ -63,6 +63,25 @@ export const MODE_INTERNAL_MAP: Record<ModeOption, string> = {
   "modus-maximus": "MODUS_MAXIMUS",
 };
 
+/**
+ * Mode-specific descriptions shown as status feedback after switching modes.
+ * Each description gives the user a concise understanding of what the mode does.
+ */
+export const MODE_DESCRIPTIONS: Record<ModeOption, string> = {
+  "auto":
+    "Default autonomous mode — classifier-driven behavior adapts to the task at hand",
+  "lightweight":
+    "Lightweight plan execution — minimal overhead for straightforward tasks",
+  "speed-campaign":
+    "Fast parallel dispatch mode — independent tasks run concurrently",
+  "medium-campaign":
+    "Orchestrated multi-wave mode — phased execution with quality gates",
+  "high-campaign":
+    "Continuous campaign mode — iterative convergence with full validation",
+  "modus-maximus":
+    "Full orchestration pipeline — end-to-end planning, execution, and review",
+};
+
 // ── /mode ────────────────────────────────────────────────────────────
 
 /**
@@ -81,10 +100,18 @@ export function handleModeCommand(host: SlashCommandHost, args: string): void {
 
   const trimmed = args.trim().toLowerCase();
 
-  // No args — just show the current mode
+  // No args — just show the current mode with its description
   if (!trimmed) {
     const currentMode = host.appState.executionMode || "not set";
-    host.showStatus(`Current mode: ${currentMode}`);
+    host.showStatus(`Current mode: ${currentMode}`, "plain");
+
+    const found = MODE_OPTIONS.find((opt) => opt === currentMode);
+    if (found) {
+      const label = MODE_DISPLAY_LABELS[found];
+      const desc = MODE_DESCRIPTIONS[found];
+      host.showStatus(`  ${label} — ${desc}`, "plain");
+    }
+
     host.showStatus("Hint: use Tab to autocomplete mode options.");
     return;
   }
@@ -101,6 +128,7 @@ export function handleModeCommand(host: SlashCommandHost, args: string): void {
   // Resolve the internal mode string
   const internalMode = MODE_INTERNAL_MAP[matched];
   const displayLabel = MODE_DISPLAY_LABELS[matched];
+  const description = MODE_DESCRIPTIONS[matched];
 
   // Tell the orchestrator to switch mode (if connected)
   if (host.orchestrator) {
@@ -110,7 +138,13 @@ export function handleModeCommand(host: SlashCommandHost, args: string): void {
   // Update the app state so current mode is tracked
   host.appState.executionMode = matched;
 
-  // Signal the mode change to the user with a styled mode announcement
-  host.showStatus(`🚀 Entered ${displayLabel}`, "success");
-  host.showStatus(`  mode: ${matched}`, "plain");
+  // ── Richer mode-change feedback ─────────────────────────────────
+
+  // 1. Show a prominent notice banner in the transcript
+  host.showNotice(`${displayLabel}`, `${description}`);
+
+  // 2. Show status feedback with the mode-specific description
+  host.showStatus(`✅ Mode switched to ${displayLabel}`, "success");
+  host.showStatus(`   ${description}`, "plain");
+  host.showStatus(`   (internal: ${internalMode})`, "plain");
 }

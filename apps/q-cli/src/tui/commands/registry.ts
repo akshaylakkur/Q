@@ -15,9 +15,9 @@ import type { AutocompleteItem } from "@earendil-works/pi-tui";
 export const MODE_ARGUMENT_COMPLETIONS: AutocompleteItem[] = [
   { value: "auto", label: "auto", description: "Default natural system behavior (classifier-driven)" },
   { value: "lightweight", label: "lightweight", description: "Lightweight plan execution" },
-  { value: "speed-campaign", label: "speed-campaign", description: "Fast parallel dispatch" },
-  { value: "medium-campaign", label: "medium-campaign", description: "Orchestrated multi-wave campaign" },
-  { value: "high-campaign", label: "high-campaign", description: "Continuous campaign with convergence" },
+  { value: "speed-campaign", label: "speed-campaign", description: "Fast parallel dispatch — decompose and run independent tasks simultaneously" },
+  { value: "medium-campaign", label: "medium-campaign", description: "Orchestrated multi-wave campaign with convergence & quality gates" },
+  { value: "high-campaign", label: "high-campaign", description: "Continuous convergence campaign with full verification & checkpointing" },
   { value: "modus-maximus", label: "modus-maximus", description: "Full orchestration pipeline" },
 ];
 

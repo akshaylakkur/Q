@@ -1,10 +1,12 @@
 /**
- * Execution mode handlers
+ * Execution mode constants — separated from index.ts to avoid
+ * circular dependency with DynamicReclassifier.
  *
- * Defines the 6 user-facing execution modes that can be selected via /mode.
- * At this stage, modes are tracked in the orchestrator and displayed in the
- * TUI, but do NOT affect the core agentic loop. Future implementations will
- * wire each mode to its specific execution strategy.
+ * This file must NOT import from any other file in the modes/ directory.
+ */
+
+/**
+ * Execution mode constants used across the system.
  *
  * User-facing modes (shown in /mode):
  *   auto             — Default natural system behavior (classifier-driven)
@@ -14,12 +16,10 @@
  *   high-campaign    — Continuous campaign with convergence
  *   modus-maximus    — Full orchestration pipeline
  *
- * Internal handler constants (used by DirectMode / LightweightPlanMode
- * handler classes which provide the actual execution fallback):
+ * Internal handler constants:
  *   DIRECT           — Direct single-turn execution
  *   LIGHTWEIGHT_PLAN — Lightweight plan execution
  */
-
 export const ExecutionModes = {
   // ── User-facing modes ──────────────────────────────────────────────
   AUTO: "AUTO",
@@ -47,18 +47,3 @@ export const USER_FACING_MODES: readonly ExecutionMode[] = [
   ExecutionModes.HIGH_CAMPAIGN,
   ExecutionModes.MODUS_MAXIMUS,
 ] as const;
-
-export { ExecutionModeHandler } from "./handler.js";
-export type { Task, ExecutionResult, SubTask, SubTaskStatus, TaskPhase } from "./types.js";
-export type { DependencyDAG, CampaignState, ExecutionMetrics, EscalationEvent, EscalationRecommendation } from "./types.js";
-
-export { DirectMode } from "./direct-mode.js";
-export { LightweightPlanMode } from "./lightweight-plan-mode.js";
-export { SpeedCampaignMode } from "./speed-campaign-mode.js";
-export { MediumCampaignMode } from "./medium-campaign-mode.js";
-export { HighCampaignMode } from "./high-campaign-mode.js";
-export type { Phase, PhasePlan, FullVerificationResult } from "./high-campaign-mode.js";
-export { ModusMaximusMode } from "./modus-maximus-mode.js";
-export type { ParsedStep, ConfirmationChoice, ConfirmationResponse, StepAgentExecResult } from "./modus-maximus-mode.js";
-export { DynamicReclassifier } from "./dynamic-reclassifier.js";
-export type { ReclassifierThresholds } from "./dynamic-reclassifier.js";

@@ -165,6 +165,14 @@ export class QTui {
       isReplaying: false,
       executionMode: "not set",
       modusMaximusPhase: "idle",
+      campaignProgress: 0,
+      campaignPhase: undefined,
+      campaignSubTaskCount: 0,
+      campaignCompletedCount: 0,
+      campaignConvergenceCount: 0,
+      campaignGateStatus: undefined,
+      campaignFilesChanged: 0,
+      campaignVerificationStatus: undefined,
     };
 
     // Create terminal
@@ -613,6 +621,26 @@ export class QTui {
       case "subagent.event":
         this.handleSubagentEvent(event);
         break;
+
+      // ── Campaign Events (handled via prefix matching) ─────────────
+      default:
+        this.routeCampaignEvent(event);
+        break;
+    }
+  }
+
+  /**
+   * Route campaign events by namespace prefix to the appropriate handler.
+   * This is called from the `default` branch of the event switch,
+   * catching all campaign events that don't match earlier cases.
+   */
+  private routeCampaignEvent(event: AgentEvent): void {
+    if (event.type.startsWith("speed-campaign.")) {
+      this.handleSpeedCampaignEvent(event);
+    } else if (event.type.startsWith("medium-campaign.")) {
+      this.handleMediumCampaignEvent(event);
+    } else if (event.type.startsWith("high-campaign.")) {
+      this.handleHighCampaignEvent(event);
     }
   }
 
@@ -643,15 +671,22 @@ export class QTui {
   }
 
   private handleTurnEnded(_event: AgentEvent): void {
-    // ── Modus Maximus guard ───────────────────────────────────────────
-    // When modus-maximus mode is active, the turn.ended event fires when
-    // plan generation finishes (Phase 1). But Phases 2-4 are still running
-    // within the same orchestrator submitPrompt() call. Do NOT reset
-    // isProcessing since the outer sendToAgent manages that lifecycle.
+    // ── Campaign mode guard ────────────────────────────────────────────
+    // When a campaign mode (speed-campaign, medium-campaign, high-campaign,
+    // or modus-maximus) is active, the turn.ended event fires when plan
+    // generation finishes (Phase 1). But subsequent phases (dispatch,
+    // convergence, verification) are still running within the same
+    // orchestrator submitPrompt() call. Do NOT reset isProcessing since
+    // the outer sendToAgent manages that lifecycle.
     // We DO need to end streaming to stop the flush timer, and we DO need
     // to stop context polling since plan output was already streamed.
-    const isModusMaximus = this.appState.executionMode === "modus-maximus";
-    if (!isModusMaximus) {
+    const isCampaignMode =
+      this.appState.executionMode === "speed-campaign" ||
+      this.appState.executionMode === "medium-campaign" ||
+      this.appState.executionMode === "high-campaign" ||
+      this.appState.executionMode === "modus-maximus";
+
+    if (!isCampaignMode) {
       this.isProcessing = false;
     }
     this.appState.streamingPhase = "idle";
@@ -662,9 +697,9 @@ export class QTui {
     // Finalize streaming — flushes all remaining buffers, stops timer
     this.streaming.endTurn();
 
-    // ── Fallback: only render missed context if NOT modus-maximus
+    // ── Fallback: only render missed context if NOT a campaign mode
     // (plan output was streamed directly via assistant.delta events)
-    if (!isModusMaximus) {
+    if (!isCampaignMode) {
       const streamingDelivered = this.streaming.hasDeliveredContent;
       if (!streamingDelivered) {
         this.renderMissedContextMessages();
@@ -931,33 +966,53 @@ export class QTui {
     this.transcriptContainer.addChild(userMsg);
     this.ui.requestRender();
 
-    // ── Route through orchestrator for mode-aware execution ──────────
-    // When modus-maximus mode is active, the orchestrator handles the
-    // full pipeline (plan generation, confirmation, sub-agent execution).
-    // The plan generation streams via normal agent events (turn.started,
-    // assistant.delta, turn.ended) so the streaming controller is managed
-    // by the existing handleTurnStarted/handleTurnEnded handlers.
-    const isModusMaximus = this.appState.executionMode === "modus-maximus";
-    if (isModusMaximus && this.orchestratorHost?.submitPrompt) {
+    // ── Campaign modes: route through orchestrator for mode-aware execution ──
+    // When a campaign mode (speed-campaign, medium-campaign, high-campaign,
+    // or modus-maximus) is active, the orchestrator handles the full pipeline
+    // including decomposition, parallel dispatch, convergence, verification,
+    // and sub-agent orchestration. The agent's normal turn events still stream
+    // (turn.started, assistant.delta, turn.ended) for visibility.
+    const isCampaignMode =
+      this.appState.executionMode === "speed-campaign" ||
+      this.appState.executionMode === "medium-campaign" ||
+      this.appState.executionMode === "high-campaign" ||
+      this.appState.executionMode === "modus-maximus";
+
+    if (isCampaignMode && this.orchestratorHost?.submitPrompt) {
       this.isProcessing = true;
 
       try {
         const result = await this.orchestratorHost.submitPrompt(text);
 
-        // Check if streaming delivered the summary or if we need a fallback
+        // ── Show the final campaign summary ──────────────────────────────
+        // During campaign execution, individual sub-tasks stream their
+        // content (thinking, tool calls, text) via normal turn events.
+        // Additionally, the final LLM summary (if generated) also streams
+        // naturally through the turn event system. We only need to render
+        // the result output as a static component if streaming did NOT
+        // deliver any content (fallback for the structured summary).
         const streamingDelivered = this.streaming.hasDeliveredContent;
         if (!streamingDelivered && result.output) {
+          const summaryLabel =
+            this.appState.executionMode === "speed-campaign" ? "⚡ Speed Campaign Results" :
+            this.appState.executionMode === "medium-campaign" ? "◈ Medium Campaign Results" :
+            this.appState.executionMode === "high-campaign" ? "⟁ High Campaign Results" :
+            "Campaign Results";
+
+          const summaryContent = `**${summaryLabel}**\n\n${result.output}`;
           const summaryComp = new AssistantMessageComponent(this.colors);
-          summaryComp.setContent(result.output);
+          summaryComp.setContent(summaryContent);
           this.transcriptContainer.addChild(summaryComp);
         }
 
         if (!result.success && result.error) {
-          this.showError(`Modus Maximus error: ${result.error}`);
+          const modeLabel = this.appState.executionMode ?? "campaign";
+          this.showError(`${modeLabel} error: ${result.error}`);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.showError(`Modus Maximus error: ${msg}`);
+        const modeLabel = this.appState.executionMode ?? "campaign";
+        this.showError(`${modeLabel} error: ${msg}`);
       } finally {
         this.isProcessing = false;
       }
@@ -989,9 +1044,16 @@ export class QTui {
   }
 
   cancelCurrentTurn(): void {
-    // During modus-maximus, cancel via the orchestrator
-    if (this.appState.executionMode === "modus-maximus") {
-      this.showStatus("Cancelling Modus Maximus...");
+    // During campaign modes, cancel via the orchestrator
+    const isCampaignMode =
+      this.appState.executionMode === "speed-campaign" ||
+      this.appState.executionMode === "medium-campaign" ||
+      this.appState.executionMode === "high-campaign" ||
+      this.appState.executionMode === "modus-maximus";
+
+    if (isCampaignMode) {
+      const modeLabel = this.appState.executionMode ?? "campaign";
+      this.showStatus(`Cancelling ${modeLabel}...`);
       if (this.orchestratorHost?.cancel) {
         this.orchestratorHost.cancel();
       } else if (this.abortController) {
@@ -1359,6 +1421,931 @@ export class QTui {
       }
       return;
     }
+  }
+
+  // ── Campaign Event Handlers ───────────────────────────────────────
+
+  /**
+   * Handle speed-campaign.* events.
+   *
+   * Speed Campaign uses a "fire-and-forget" parallel dispatch model:
+   *   - speed-campaign.started         → campaign started with N sub-tasks
+   *   - speed-campaign.subtask.started  → individual sub-task dispatched
+   *   - speed-campaign.subtask.completed→ individual sub-task succeeded
+   *   - speed-campaign.subtask.failed   → individual sub-task failed
+   *   - speed-campaign.completed        → campaign finished (success or failure)
+   *   - speed-campaign.syntax-diagnostics → syntax validation diagnostics
+   *   - speed-campaign.file-conflict    → file write conflict between sub-tasks
+   *
+   * Updates:
+   *   - appState.executionMode
+   *   - appState.campaignProgress (percentage based on completed/total)
+   *   - appState.campaignPhase
+   *   - appState.campaignSubTaskCount
+   *   - appState.campaignCompletedCount
+   *   - Transcript with status messages
+   */
+  private handleSpeedCampaignEvent(event: AgentEvent): void {
+    // Ensure execution mode is set
+    this.appState.executionMode = "speed-campaign";
+
+    switch (event.type) {
+      case "speed-campaign.started": {
+        const subTaskCount = (event as any).subTaskCount ?? 0;
+        this.appState.campaignPhase = "dispatching";
+        this.appState.campaignSubTaskCount = subTaskCount;
+        this.appState.campaignCompletedCount = 0;
+        this.appState.campaignProgress = 0;
+
+        this.showStatus(
+          `🚀 Speed Campaign started — ${subTaskCount} sub-task${subTaskCount !== 1 ? "s" : ""} dispatched in parallel`,
+          "info",
+        );
+        break;
+      }
+
+      case "speed-campaign.subtask.started": {
+        const subTaskId = (event as any).subTaskId ?? "?";
+        const description = (event as any).description ?? "";
+        const desc = description ? `: ${description.slice(0, 60)}` : "";
+        this.showStatus(`  ⚡ Sub-task ${subTaskId} started${desc}`, "info");
+        break;
+      }
+
+      case "speed-campaign.subtask.completed": {
+        const subTaskId = (event as any).subTaskId ?? "?";
+        const completed = (this.appState.campaignCompletedCount ?? 0) + 1;
+        this.appState.campaignCompletedCount = completed;
+
+        // Update progress percentage
+        const total = this.appState.campaignSubTaskCount ?? 1;
+        this.appState.campaignProgress = Math.round((completed / total) * 100);
+
+        this.showStatus(
+          `  ✅ Sub-task ${subTaskId} completed (${completed}/${total})`,
+          "success",
+        );
+        break;
+      }
+
+      case "speed-campaign.subtask.failed": {
+        const subTaskId = (event as any).subTaskId ?? "?";
+        const error = (event as any).error ?? "unknown error";
+        this.showStatus(
+          `  ❌ Sub-task ${subTaskId} failed — ${error}`,
+          "error",
+        );
+        break;
+      }
+
+      case "speed-campaign.completed": {
+        const success = (event as any).success === true;
+        const subTaskCount = (event as any).subTaskCount ?? 0;
+        const duration = (event as any).duration ?? 0;
+
+        this.appState.campaignPhase = success ? "completed" : "failed";
+        this.appState.campaignProgress = success ? 100 : this.appState.campaignProgress ?? 0;
+
+        if (success) {
+          this.showStatus(
+            `✅ Speed Campaign complete — ${subTaskCount} sub-task${subTaskCount !== 1 ? "s" : ""} finished in ${(duration / 1000).toFixed(1)}s`,
+            "success",
+          );
+        } else {
+          this.showStatus(
+            `❌ Speed Campaign failed after ${(duration / 1000).toFixed(1)}s`,
+            "error",
+          );
+        }
+        break;
+      }
+
+      case "speed-campaign.syntax-diagnostics": {
+        const count = (event as any).count ?? 0;
+        if (count > 0) {
+          this.showStatus(
+            `  ⚠️  ${count} syntax diagnostic${count !== 1 ? "s" : ""} found`,
+            "warning",
+          );
+        }
+        break;
+      }
+
+      case "speed-campaign.file-conflict": {
+        const file = (event as any).file ?? "unknown";
+        const subTasks = (event as any).subTasks ?? [];
+        this.showStatus(
+          `  🔀 File conflict detected in ${file} between sub-tasks: ${subTasks.join(", ")}`,
+          "warning",
+        );
+        break;
+      }
+    }
+
+    this.ui.requestRender();
+  }
+
+  /**
+   * Handle medium-campaign.* events.
+   *
+   * Medium Campaign uses a wave-based orchestration model with convergence:
+   *   - medium-campaign.started              → campaign started
+   *   - medium-campaign.decomposing           → generating task graph
+   *   - medium-campaign.graph-ready           → task graph generated (totalWaves, totalNodes)
+   *   - medium-campaign.wave-execution-starting→ starting wave execution
+   *   - medium-campaign.wave.started          → individual wave started (waveIndex, phase, taskCount)
+   *   - medium-campaign.wave.completed        → individual wave completed
+   *   - medium-campaign.subtask.started       → sub-task within wave dispatched
+   *   - medium-campaign.subtask.completed/... → sub-task result
+   *   - medium-campaign.convergence.starting  → convergence starting after wave
+   *   - medium-campaign.convergence.complete  → convergence finished
+   *   - medium-campaign.verification.*        → verification phase events
+   *   - medium-campaign.gate.*                → quality gate results
+   *   - medium-campaign.correction.*          → self-correction events
+   *   - medium-campaign.completed             → campaign finished
+   *
+   * Updates:
+   *   - appState.executionMode
+   *   - appState.campaignPhase (wave index / phase name)
+   *   - appState.campaignProgress
+   *   - appState.campaignGateStatus
+   *   - appState.campaignConvergenceCount
+   *   - Transcript with wave progress and gate status
+   */
+  private handleMediumCampaignEvent(event: AgentEvent): void {
+    // Ensure execution mode is set
+    this.appState.executionMode = "medium-campaign";
+
+    switch (event.type) {
+      case "medium-campaign.started": {
+        this.appState.campaignPhase = "decomposing";
+        this.appState.campaignProgress = 0;
+        this.appState.campaignConvergenceCount = 0;
+        this.appState.campaignGateStatus = "pending";
+
+        this.showStatus("◈ Medium Campaign started — decomposing task...", "info");
+        break;
+      }
+
+      case "medium-campaign.decomposing": {
+        this.appState.campaignPhase = "decomposing";
+        this.showStatus("  ◈ Generating task dependency graph...", "info");
+        break;
+      }
+
+      case "medium-campaign.graph-ready": {
+        const totalWaves = (event as any).totalWaves ?? 0;
+        const totalNodes = (event as any).totalNodes ?? 0;
+        this.appState.campaignPhase = "graph-ready";
+        this.appState.campaignSubTaskCount = totalNodes;
+
+        this.showStatus(
+          `  📊 Task graph ready — ${totalWaves} wave${totalWaves !== 1 ? "s" : ""}, ${totalNodes} task${totalNodes !== 1 ? "s" : ""}`,
+          "info",
+        );
+        break;
+      }
+
+      case "medium-campaign.wave-execution-starting": {
+        const totalWaves = (event as any).totalWaves ?? 0;
+        this.appState.campaignPhase = "executing-waves";
+        this.appState.campaignProgress = 0;
+
+        this.showStatus(
+          `  🌊 Executing ${totalWaves} wave${totalWaves !== 1 ? "s" : ""} sequentially`,
+          "info",
+        );
+        break;
+      }
+
+      case "medium-campaign.wave.started": {
+        const waveIndex = (event as any).waveIndex ?? 0;
+        const phase = (event as any).phase ?? "";
+        const taskCount = (event as any).taskCount ?? 0;
+
+        this.appState.campaignPhase = `wave-${waveIndex}`;
+
+        if (taskCount > 0) {
+          this.showStatus(
+            `  🌊 Wave ${waveIndex} (${phase}) started — ${taskCount} task${taskCount !== 1 ? "s" : ""}`,
+            "info",
+          );
+        }
+        break;
+      }
+
+      case "medium-campaign.wave.completed": {
+        const waveIndex = (event as any).waveIndex ?? 0;
+        const waveSuccess = (event as any).success === true;
+        const errors = (event as any).errors ?? [];
+
+        // Update rough progress based on wave completion
+        const completed = waveIndex + 1;
+        const total = this.appState.campaignSubTaskCount ?? completed;
+        this.appState.campaignProgress = Math.min(
+          80,
+          Math.round((completed / Math.max(total, completed)) * 80),
+        );
+
+        if (waveSuccess) {
+          this.showStatus(
+            `  ✅ Wave ${waveIndex} completed`,
+            "success",
+          );
+        } else {
+          this.showStatus(
+            `  ⚠️  Wave ${waveIndex} completed with ${errors.length} error${errors.length !== 1 ? "s" : ""}`,
+            "warning",
+          );
+        }
+        break;
+      }
+
+      case "medium-campaign.subtask.started": {
+        const description = (event as any).description ?? "";
+        const desc = description ? `: ${description.slice(0, 60)}` : "";
+        this.showStatus(`    📋 Sub-task started${desc}`, "info");
+        break;
+      }
+
+      case "medium-campaign.subtask.completed": {
+        this.showStatus(`    ✅ Sub-task completed`, "success");
+        break;
+      }
+
+      case "medium-campaign.subtask.failed": {
+        const error = (event as any).error ?? "unknown error";
+        this.showStatus(`    ❌ Sub-task failed — ${error}`, "error");
+        break;
+      }
+
+      case "medium-campaign.convergence.starting": {
+        this.appState.campaignPhase = "converging";
+        this.showStatus("  🔄 Running convergence on wave results...", "info");
+        break;
+      }
+
+      case "medium-campaign.convergence.complete": {
+        const convergenceCount = (this.appState.campaignConvergenceCount ?? 0) + 1;
+        this.appState.campaignConvergenceCount = convergenceCount;
+        this.showStatus(
+          `  ✅ Convergence cycle ${convergenceCount} complete`,
+          "success",
+        );
+        break;
+      }
+
+      case "medium-campaign.convergence.error": {
+        const errMsg = (event as any).error ?? "unknown convergence error";
+        this.showStatus(`  ⚠️  Convergence error — ${errMsg}`, "warning");
+        break;
+      }
+
+      case "medium-campaign.wave-execution-complete": {
+        this.appState.campaignPhase = "wave-execution-complete";
+        this.appState.campaignProgress = 80;
+        this.showStatus("  ✅ All wave executions complete — running verification...", "success");
+        break;
+      }
+
+      case "medium-campaign.verification.started": {
+        this.appState.campaignPhase = "verifying";
+        this.showStatus("  🔍 Running verification...", "info");
+        break;
+      }
+
+      case "medium-campaign.verification.passed": {
+        this.appState.campaignPhase = "verification-passed";
+        this.appState.campaignGateStatus = "pass";
+        const fileCount = (event as any).fileCount ?? 0;
+        this.showStatus(
+          `  ✅ Verification passed — ${fileCount} file${fileCount !== 1 ? "s" : ""} checked`,
+          "success",
+        );
+        break;
+      }
+
+      case "medium-campaign.verification.failed": {
+        this.appState.campaignPhase = "verification-failed";
+        this.appState.campaignGateStatus = "fail";
+        this.showStatus("  ❌ Verification failed — initiating correction...", "error");
+        break;
+      }
+
+      case "medium-campaign.verification.skipped": {
+        this.showStatus("  ⏭️  Verification skipped (no files changed)", "info");
+        break;
+      }
+
+      case "medium-campaign.gate.passed": {
+        this.appState.campaignGateStatus = "pass";
+        this.showStatus("  ✅ Quality gate: PASSED", "success");
+        break;
+      }
+
+      case "medium-campaign.gate.failed": {
+        this.appState.campaignGateStatus = "fail";
+        this.showStatus("  ❌ Quality gate: FAILED", "error");
+        break;
+      }
+
+      case "medium-campaign.correction.started": {
+        this.appState.campaignPhase = "correcting";
+        this.showStatus("  🔧 Self-correction in progress...", "warning");
+        break;
+      }
+
+      case "medium-campaign.correction.complete": {
+        const success = (event as any).success === true;
+        const attempts = (event as any).attempts ?? 1;
+        if (success) {
+          this.showStatus(
+            `  ✅ Self-correction succeeded (${attempts} attempt${attempts !== 1 ? "s" : ""})`,
+            "success",
+          );
+        } else {
+          this.showStatus(
+            `  ⚠️  Self-correction exhausted after ${attempts} attempt${attempts !== 1 ? "s" : ""}`,
+            "warning",
+          );
+        }
+        break;
+      }
+
+      case "medium-campaign.completed": {
+        const success = (event as any).success === true;
+        this.appState.campaignPhase = success ? "completed" : "failed";
+        this.appState.campaignProgress = success ? 100 : this.appState.campaignProgress ?? 0;
+
+        if (success) {
+          this.showStatus(
+            `✅ Medium Campaign complete — ${this.appState.campaignConvergenceCount ?? 0} convergence cycle${(this.appState.campaignConvergenceCount ?? 0) !== 1 ? "s" : ""}`,
+            "success",
+          );
+        } else {
+          this.showStatus(
+            "❌ Medium Campaign failed",
+            "error",
+          );
+        }
+        break;
+      }
+
+      case "medium-campaign.aborted": {
+        this.appState.campaignPhase = "aborted";
+        const reason = (event as any).reason ?? "Cancelled";
+        this.showStatus(`⏹️  Medium Campaign aborted — ${reason}`, "warning");
+        break;
+      }
+    }
+
+    this.ui.requestRender();
+  }
+
+  /**
+   * Handle high-campaign.* events.
+   *
+   * High Campaign uses a continuous convergence model with phases,
+   * verification, checkpoints, and self-correction:
+   *   - high-campaign.started                → campaign started
+   *   - high-campaign.planning               → generating phase plan
+   *   - high-campaign.plan-ready             → phase plan ready
+   *   - high-campaign.phase.started          → phase began (phase, phaseIndex)
+   *   - high-campaign.phase.completed        → phase finished
+   *   - high-campaign.phase.failed           → phase exhausted attempts
+   *   - high-campaign.convergence-cycle.started → convergence cycle began
+   *   - high-campaign.convergence-cycle.passed  → cycle passed verification
+   *   - high-campaign.convergence-cycle.failed  → cycle failed
+   *   - high-campaign.convergence-cycle.retrying→ cycle retrying
+   *   - high-campaign.convergence-cycle.skipped-verification → no files changed
+   *   - high-campaign.convergence-cycle.exhausted → max retries reached
+   *   - high-campaign.convergence.starting    → convergence engine starting
+   *   - high-campaign.convergence.cycle       → convergence cycle completed
+   *   - high-campaign.convergence.complete    → convergence finished
+   *   - high-campaign.verification.*          → verification events
+   *   - high-campaign.gate.*                  → quality gate results
+   *   - high-campaign.correction.*            → self-correction events
+   *   - high-campaign.checkpoint.*            → checkpoint save/restore
+   *   - high-campaign.completed               → campaign finished
+   *   - high-campaign.paused / resumed        → pause/resume lifecycle
+   *   - high-campaign.progress-checkpoint     → periodic progress updates
+   *   - high-campaign.all-phases-completed    → all phases done
+   *
+   * Updates:
+   *   - appState.executionMode
+   *   - appState.campaignPhase (phase name / cycle info)
+   *   - appState.campaignProgress
+   *   - appState.campaignConvergenceCount
+   *   - appState.campaignFilesChanged
+   *   - appState.campaignVerificationStatus
+   *   - appState.campaignGateStatus
+   *   - Transcript with detailed convergence and verification status
+   */
+  private handleHighCampaignEvent(event: AgentEvent): void {
+    // Ensure execution mode is set
+    this.appState.executionMode = "high-campaign";
+
+    switch (event.type) {
+      // ── Lifecycle ──────────────────────────────────────────────────
+      case "high-campaign.started": {
+        this.appState.campaignPhase = "planning";
+        this.appState.campaignProgress = 0;
+        this.appState.campaignConvergenceCount = 0;
+        this.appState.campaignFilesChanged = 0;
+        this.appState.campaignVerificationStatus = "running";
+
+        const campaignId = (event as any).campaignId ?? "";
+        this.showStatus(
+          `⟁ High Campaign started${campaignId ? ` (${campaignId.slice(0, 12)}…)` : ""} — generating phase plan...`,
+          "info",
+        );
+        break;
+      }
+
+      case "high-campaign.planning": {
+        this.appState.campaignPhase = "planning";
+        this.showStatus("  ⟁ Generating phase convergence plan...", "info");
+        break;
+      }
+
+      case "high-campaign.plan-ready": {
+        const totalPhases = (event as any).totalPhases ?? 0;
+        this.appState.campaignPhase = "plan-ready";
+
+        this.showStatus(
+          `  📋 Phase plan ready — ${totalPhases} phase${totalPhases !== 1 ? "s" : ""} to execute`,
+          "info",
+        );
+        break;
+      }
+
+      case "high-campaign.all-phases-completed": {
+        this.appState.campaignPhase = "all-phases-completed";
+        this.showStatus("  ✅ All phases already completed (checkpoint restored)", "success");
+        break;
+      }
+
+      // ── Phase execution ────────────────────────────────────────────
+      case "high-campaign.phase.started": {
+        const phase = (event as any).phase ?? "";
+        const phaseIndex = (event as any).phaseIndex ?? 0;
+        const totalPhases = (event as any).totalPhases ?? 0;
+
+        this.appState.campaignPhase = `phase-${phase}`;
+
+        // Update progress: each phase is roughly (100 / totalPhases)%
+        const phaseProgress = Math.round((phaseIndex / Math.max(totalPhases, 1)) * 70);
+        this.appState.campaignProgress = Math.max(this.appState.campaignProgress ?? 0, phaseProgress);
+
+        this.showStatus(
+          `  📌 Phase ${phaseIndex + 1}/${totalPhases}: ${phase}`,
+          "info",
+        );
+        break;
+      }
+
+      case "high-campaign.phase.completed": {
+        const phaseName = (event as any).phaseName ?? (event as any).phase ?? "";
+        this.appState.campaignPhase = `${phaseName}-completed`;
+
+        // Update progress based on completed phases
+        const progress = Math.min(85, (this.appState.campaignProgress ?? 0) + 10);
+        this.appState.campaignProgress = progress;
+
+        this.showStatus(
+          `  ✅ Phase "${phaseName}" completed`,
+          "success",
+        );
+        break;
+      }
+
+      case "high-campaign.phase.failed": {
+        const phaseId = (event as any).phaseId ?? "";
+        const phaseName = (event as any).phaseName ?? "";
+        const reason = (event as any).reason ?? "Max attempts reached";
+
+        this.appState.campaignPhase = `${phaseName}-failed`;
+
+        this.showStatus(
+          `  ❌ Phase "${phaseName || phaseId}" failed — ${reason}`,
+          "error",
+        );
+
+        // Check if escalation was recommended
+        if (event.type.includes("escalation")) {
+          this.showStatus("  🔄 Escalating to re-classification...", "warning");
+        }
+        break;
+      }
+
+      case "high-campaign.escalation.recommended": {
+        this.showStatus("  ⬆️ Escalation recommended — re-classifying task", "warning");
+        break;
+      }
+
+      // ── Convergence cycles ─────────────────────────────────────────
+      case "high-campaign.convergence-cycle.started": {
+        const attempt = (event as any).attempt ?? 1;
+        const maxAttempts = (event as any).maxAttempts ?? 3;
+        const convergenceCount = (event as any).convergenceCount ?? 0;
+
+        this.appState.campaignPhase = `convergence-cycle-${convergenceCount}`;
+        this.appState.campaignConvergenceCount = convergenceCount;
+
+        this.showStatus(
+          `  🔄 Convergence cycle ${convergenceCount} (attempt ${attempt}/${maxAttempts})`,
+          "info",
+        );
+        break;
+      }
+
+      case "high-campaign.convergence-cycle.passed": {
+        const attempt = (event as any).attempt ?? 1;
+        const convergenceCount = (event as any).convergenceCount ?? 0;
+        const changedFiles = (event as any).changedFiles ?? 0;
+
+        // Track files changed
+        this.appState.campaignFilesChanged = (this.appState.campaignFilesChanged ?? 0) + changedFiles;
+        this.appState.campaignPhase = `convergence-passed-${convergenceCount}`;
+
+        this.showStatus(
+          `  ✅ Convergence cycle ${convergenceCount} passed (attempt ${attempt}, ${changedFiles} file${changedFiles !== 1 ? "s" : ""} changed)`,
+          "success",
+        );
+        break;
+      }
+
+      case "high-campaign.convergence-cycle.failed": {
+        const attempt = (event as any).attempt ?? 1;
+        const reason = (event as any).reason ?? "No sub-tasks completed";
+        this.showStatus(
+          `  ❌ Convergence cycle failed (attempt ${attempt}) — ${reason}`,
+          "error",
+        );
+        break;
+      }
+
+      case "high-campaign.convergence-cycle.retrying": {
+        const nextAttempt = (event as any).nextAttempt ?? 1;
+        const maxAttempts = (event as any).maxAttempts ?? 3;
+        this.showStatus(
+          `  🔄 Retrying convergence cycle (attempt ${nextAttempt}/${maxAttempts})...`,
+          "warning",
+        );
+        break;
+      }
+
+      case "high-campaign.convergence-cycle.skipped-verification": {
+        this.showStatus("  ⏭️  Skipping verification (no files changed this cycle)", "info");
+        break;
+      }
+
+      case "high-campaign.convergence-cycle.exhausted": {
+        this.showStatus("  ⛔ Convergence cycles exhausted — max retries reached", "error");
+        break;
+      }
+
+      case "high-campaign.passed-after-correction":
+      case "high-campaign.convergence-cycle.passed-after-correction": {
+        const convCount = (event as any).convergenceCount ?? this.appState.campaignConvergenceCount ?? 0;
+        this.showStatus(
+          `  ✅ Convergence cycle ${convCount} passed after self-correction`,
+          "success",
+        );
+        break;
+      }
+
+      // ── Convergence engine events ──────────────────────────────────
+      case "high-campaign.convergence.starting": {
+        this.appState.campaignPhase = "converging";
+        this.showStatus("  🔄 Running convergence engine...", "info");
+        break;
+      }
+
+      case "high-campaign.convergence.cycle": {
+        const convergenceNumber = (event as any).convergenceNumber ?? 0;
+        const totalConflicts = (event as any).totalConflicts ?? 0;
+
+        if (totalConflicts > 0) {
+          this.showStatus(
+            `  🔄 Convergence round ${convergenceNumber} — ${totalConflicts} conflict${totalConflicts !== 1 ? "s" : ""} resolved`,
+            "info",
+          );
+        }
+        break;
+      }
+
+      case "high-campaign.convergence.complete": {
+        this.showStatus("  ✅ Convergence engine cycle complete", "success");
+        break;
+      }
+
+      case "high-campaign.convergence.error": {
+        const errMsg = (event as any).error ?? "convergence error";
+        this.showStatus(`  ⚠️  Convergence error — ${errMsg}`, "warning");
+        break;
+      }
+
+      // ── Verification events ────────────────────────────────────────
+      case "high-campaign.verification.started": {
+        this.appState.campaignVerificationStatus = "running";
+        this.appState.campaignPhase = "verifying";
+        const fileCount = (event as any).fileCount ?? 0;
+        this.showStatus(
+          `  🔍 Running verification on ${fileCount} file${fileCount !== 1 ? "s" : ""}...`,
+          "info",
+        );
+        break;
+      }
+
+      case "high-campaign.verification.complete": {
+        const passed = (event as any).passed === true;
+        this.appState.campaignVerificationStatus = passed ? "passing" : "failing";
+
+        if (passed) {
+          this.showStatus("  ✅ Verification passed", "success");
+        } else {
+          this.showStatus("  ❌ Verification failed — attempting correction...", "error");
+        }
+        break;
+      }
+
+      case "high-campaign.verification.failed": {
+        this.appState.campaignVerificationStatus = "failing";
+        this.showStatus("  ❌ Verification failed", "error");
+        break;
+      }
+
+      case "high-campaign.verification.skipped": {
+        this.showStatus("  ⏭️  Verification skipped (no files changed)", "info");
+        break;
+      }
+
+      case "high-campaign.verification.diagnostics": {
+        const diagCount = (event as any).diagnostics?.length ?? 0;
+        if (diagCount > 0) {
+          this.showStatus(
+            `  📋 ${diagCount} diagnostic${diagCount !== 1 ? "s" : ""} from verification`,
+            "info",
+          );
+        }
+        break;
+      }
+
+      // ── Self-correction events ─────────────────────────────────────
+      case "high-campaign.verification.self-correction.started":
+      case "high-campaign.correction.started": {
+        this.appState.campaignPhase = "correcting";
+        this.showStatus("  🔧 Self-correction in progress...", "warning");
+        break;
+      }
+
+      case "high-campaign.verification.self-correction.succeeded":
+      case "high-campaign.correction.succeeded": {
+        this.appState.campaignPhase = "correction-applied";
+        this.showStatus("  ✅ Self-correction applied successfully", "success");
+        break;
+      }
+
+      case "high-campaign.verification.self-correction.failed":
+      case "high-campaign.correction.failed": {
+        this.showStatus("  ❌ Self-correction failed — escalating...", "error");
+        break;
+      }
+
+      case "high-campaign.correction.progress": {
+        const progress = (event as any).progress ?? "";
+        if (progress) {
+          this.showStatus(`  🔧 Correction progress: ${progress}`, "info");
+        }
+        break;
+      }
+
+      case "high-campaign.correction.result": {
+        const success = (event as any).success === true;
+        this.showStatus(
+          success ? "  ✅ Correction result: success" : "  ❌ Correction result: failed",
+          success ? "success" : "error",
+        );
+        break;
+      }
+
+      case "high-campaign.correction.error": {
+        const errMsg = (event as any).error ?? "correction error";
+        this.showStatus(`  ❌ Correction error — ${errMsg}`, "error");
+        break;
+      }
+
+      case "high-campaign.correction.skipped": {
+        this.showStatus("  ⏭️  Correction skipped — no self-correction needed", "info");
+        break;
+      }
+
+      // ── Re-verification events ─────────────────────────────────────
+      case "high-campaign.re-verification.failed": {
+        this.showStatus("  ❌ Re-verification failed after correction", "error");
+        break;
+      }
+
+      // ── Escalation events ──────────────────────────────────────────
+      case "high-campaign.verification.escalation.failed": {
+        this.showStatus("  ❌ Escalation failed — all correction paths exhausted", "error");
+        break;
+      }
+
+      case "high-campaign.verification.escalation.succeeded": {
+        this.showStatus("  ✅ Escalation succeeded — issue resolved", "success");
+        break;
+      }
+
+      case "high-campaign.escalation.evaluated": {
+        this.showStatus("  ⬆️ Escalation evaluated — continuing...", "info");
+        break;
+      }
+
+      // ── Quality gates ──────────────────────────────────────────────
+      case "high-campaign.gate.passed": {
+        this.appState.campaignGateStatus = "pass";
+        this.showStatus("  ✅ Quality gate: PASSED", "success");
+        break;
+      }
+
+      case "high-campaign.gate.failed": {
+        this.appState.campaignGateStatus = "fail";
+        this.showStatus("  ❌ Quality gate: FAILED", "error");
+        break;
+      }
+
+      case "high-campaign.gate.skipped": {
+        this.appState.campaignGateStatus = "pending";
+        this.showStatus("  ⏭️  Quality gate: SKIPPED", "info");
+        break;
+      }
+
+      // ── Checkpoint events ──────────────────────────────────────────
+      case "high-campaign.checkpoint.restored": {
+        const completedPhases = (event as any).completedPhases ?? [];
+        const convergenceCount = (event as any).convergenceCount ?? 0;
+
+        this.appState.campaignConvergenceCount = convergenceCount;
+        this.appState.campaignPhase = "checkpoint-restored";
+
+        this.showStatus(
+          `  📦 Checkpoint restored — ${completedPhases.length} phase${completedPhases.length !== 1 ? "s" : ""} already completed, ${convergenceCount} convergence cycle${convergenceCount !== 1 ? "s" : ""} done`,
+          "info",
+        );
+        break;
+      }
+
+      case "high-campaign.checkpoint.saved": {
+        this.showStatus("  💾 Checkpoint saved", "success");
+        break;
+      }
+
+      case "high-campaign.checkpoint.skipped": {
+        this.showStatus("  ⏭️  Checkpoint skipped (nothing to save)", "info");
+        break;
+      }
+
+      case "high-campaign.checkpoint.error": {
+        const errMsg = (event as any).error ?? "checkpoint error";
+        this.showStatus(`  ⚠️  Checkpoint error — ${errMsg}`, "warning");
+        break;
+      }
+
+      case "high-campaign.checkpoint.invalid": {
+        this.showStatus("  ⚠️  Checkpoint data invalid — starting fresh", "warning");
+        break;
+      }
+
+      case "high-campaign.checkpoint.restore-error": {
+        const errMsg = (event as any).error ?? "restore error";
+        this.showStatus(`  ⚠️  Checkpoint restore error — ${errMsg}`, "warning");
+        break;
+      }
+
+      // ── Pause / Resume ─────────────────────────────────────────────
+      case "high-campaign.paused": {
+        this.appState.campaignPhase = "paused";
+        const phase = (event as any).phase ?? "";
+        this.showStatus(
+          `⏸️  Campaign paused${phase ? ` (phase: ${phase})` : ""}`,
+          "warning",
+        );
+        break;
+      }
+
+      case "high-campaign.pausing": {
+        this.appState.campaignPhase = "pausing";
+        this.showStatus("⏸️  Campaign pausing...", "warning");
+        break;
+      }
+
+      case "high-campaign.resumed": {
+        this.appState.campaignPhase = "resumed";
+        this.showStatus("▶️  Campaign resumed", "success");
+        break;
+      }
+
+      // ── Progress checkpoints ───────────────────────────────────────
+      case "high-campaign.progress-checkpoint": {
+        const filesChanged = (event as any).filesChanged ?? 0;
+        const pct = (event as any).progress ?? this.appState.campaignProgress ?? 0;
+
+        this.appState.campaignFilesChanged = filesChanged;
+        this.appState.campaignProgress = Math.max(this.appState.campaignProgress ?? 0, pct);
+
+        this.showStatus(
+          `  📊 Progress: ${pct}% — ${filesChanged} file${filesChanged !== 1 ? "s" : ""} changed`,
+          "info",
+        );
+        break;
+      }
+
+      // ── Sub-task events ────────────────────────────────────────────
+      case "high-campaign.subtask.started": {
+        const description = (event as any).description ?? "";
+        const desc = description ? `: ${description.slice(0, 80)}` : "";
+        this.showStatus(`    📋 Sub-task started${desc}`, "info");
+        break;
+      }
+
+      case "high-campaign.subtask.completed": {
+        this.appState.campaignCompletedCount = (this.appState.campaignCompletedCount ?? 0) + 1;
+        this.showStatus(`    ✅ Sub-task completed`, "success");
+        break;
+      }
+
+      case "high-campaign.subtask.failed": {
+        const error = (event as any).error ?? "unknown error";
+        this.showStatus(`    ❌ Sub-task failed — ${error}`, "error");
+        break;
+      }
+
+      // ── Cycle decomposition events ─────────────────────────────────
+      case "high-campaign.cycle.executing": {
+        this.showStatus("  🔄 Executing convergence cycle tasks...", "info");
+        break;
+      }
+
+      case "high-campaign.cycle.no-tasks": {
+        this.showStatus("  ⏭️  No tasks to execute this cycle", "info");
+        break;
+      }
+
+      case "high-campaign.cycle.decomposed": {
+        const taskCount = (event as any).taskCount ?? 0;
+        this.showStatus(
+          `  📊 Cycle decomposed into ${taskCount} task${taskCount !== 1 ? "s" : ""}`,
+          "info",
+        );
+        break;
+      }
+
+      case "high-campaign.cycle.collected": {
+        this.showStatus("  📥 Collecting cycle results...", "info");
+        break;
+      }
+
+      case "high-campaign.cycle.completed": {
+        this.showStatus("  ✅ Convergence cycle execution complete", "success");
+        break;
+      }
+
+      // ── Verification pipeline errors ───────────────────────────────
+      case "high-campaign.verification.pipeline-error": {
+        const errMsg = (event as any).error ?? "pipeline error";
+        this.showStatus(`  ❌ Verification pipeline error — ${errMsg}`, "error");
+        break;
+      }
+
+      // ── Completion ─────────────────────────────────────────────────
+      case "high-campaign.completed": {
+        const success = (event as any).success === true;
+
+        this.appState.campaignPhase = success ? "completed" : "failed";
+        this.appState.campaignProgress = success ? 100 : this.appState.campaignProgress ?? 0;
+        this.appState.campaignVerificationStatus = success ? "passing" : "failing";
+
+        const filesChanged = this.appState.campaignFilesChanged ?? 0;
+        const convergenceCount = this.appState.campaignConvergenceCount ?? 0;
+
+        if (success) {
+          this.showStatus(
+            `✅ High Campaign complete — ${convergenceCount} convergence cycle${convergenceCount !== 1 ? "s" : ""}, ${filesChanged} file${filesChanged !== 1 ? "s" : ""} changed`,
+            "success",
+          );
+        } else {
+          this.showStatus(
+            `❌ High Campaign failed — ${convergenceCount} convergence cycle${convergenceCount !== 1 ? "s" : ""} completed`,
+            "error",
+          );
+        }
+        break;
+      }
+    }
+
+    this.ui.requestRender();
   }
 
   // ── UI Helpers ─────────────────────────────────────────────────────

@@ -117,7 +117,7 @@ describe("LightweightPlanMode", () => {
 });
 
 // =========================================================================
-// 4. DynamicReclassifier (stub — always returns no escalation)
+// 4. DynamicReclassifier (real implementation — escalates on signals)
 // =========================================================================
 
 describe("DynamicReclassifier", () => {
@@ -134,12 +134,13 @@ describe("DynamicReclassifier", () => {
     };
   }
 
-  it("always returns no escalation (stub)", () => {
+  it("does not escalate with low metrics (no signals)", () => {
     const result = reclassifier.reclassify(makeMetrics());
+    // Low metrics (no tool failures, low turn count) should not escalate
     expect(result.shouldEscalate).toBe(false);
   });
 
-  it("always returns no escalation even with error signals", () => {
+  it("recommends escalation with high tool failure signals", () => {
     const current = makeMetrics({
       usage: { totalTokens: 20000, inputTokens: 10000, outputTokens: 10000 },
       toolCalls: { total: 10, failed: 8 },
@@ -147,7 +148,7 @@ describe("DynamicReclassifier", () => {
     });
     const previous = makeMetrics({ usage: { totalTokens: 1000, inputTokens: 500, outputTokens: 500 } });
     const result = reclassifier.reclassify(current, previous);
-    expect(result.shouldEscalate).toBe(false);
+    expect(result.shouldEscalate).toBe(true);
   });
 
   it("always returns a valid reason string", () => {

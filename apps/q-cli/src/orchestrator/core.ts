@@ -518,6 +518,19 @@ export class OrchestratorCore {
       } finally {
         this._modusMaximusHandler = null;
       }
+    } else if (mode === ExecutionModes.SPEED_CAMPAIGN) {
+      const { SpeedCampaignMode } = await import("./modes/speed-campaign-mode.js");
+      const handler = new SpeedCampaignMode();
+      result = await handler.execute(task, this);
+    } else if (mode === ExecutionModes.MEDIUM_CAMPAIGN) {
+      const { MediumCampaignMode } = await import("./modes/medium-campaign-mode.js");
+      const handler = new MediumCampaignMode();
+      result = await handler.execute(task, this);
+    } else if (mode === ExecutionModes.HIGH_CAMPAIGN) {
+      const { HighCampaignMode } = await import("./modes/high-campaign-mode.js");
+      const handler = new HighCampaignMode();
+      this._modusMaximusHandler = null; // reuse the pattern
+      result = await handler.execute(task, this);
     } else {
       const { LightweightPlanMode } = await import("./modes/lightweight-plan-mode.js");
       const handler = new LightweightPlanMode();
@@ -527,6 +540,71 @@ export class OrchestratorCore {
     // Override the result mode to reflect what was actually requested
     // (handlers always return their own hardcoded mode constant)
     result.mode = mode;
+
+    // ── Reclassification & outcome tracking ─────────────────────────────
+    // Record the outcome of this mode execution so the reclassifier can
+    // learn from past escalations (success/failure).
+    const previousMode = this.currentMode ?? ExecutionModes.AUTO;
+    this.dynamicReclassifier.recordOutcome(previousMode, mode, result.success);
+
+    // Build current metrics using the orchestrator's aggregated counters,
+    // enriched with result-specific data (token usage, changed files, etc.)
+    const currentMetrics = this.buildMetrics();
+
+    // If result has metadata we can capture, enrich the metrics
+    if (result.changedFiles && result.changedFiles.length > 0) {
+      currentMetrics.metadata = {
+        ...(currentMetrics.metadata ?? {}),
+        changedFiles: result.changedFiles.length,
+      };
+    }
+    if (result.totalTokens !== undefined) {
+      currentMetrics.usage.totalTokens = result.totalTokens;
+      currentMetrics.usage.inputTokens = Math.floor(result.totalTokens / 2);
+      currentMetrics.usage.outputTokens = Math.floor(result.totalTokens / 2);
+    }
+    if (result.subResults && result.subResults.length > 0) {
+      const failedSubs = result.subResults.filter((sr) => !sr.success).length;
+      if (failedSubs > 0) {
+        currentMetrics.metadata = {
+          ...(currentMetrics.metadata ?? {}),
+          failedSubTasks: failedSubs,
+        };
+      }
+    }
+
+    // Run reclassification to detect if mode escalation is warranted
+    const escalation = this.dynamicReclassifier.reclassify(
+      currentMetrics,
+      this.previousMetrics,
+    );
+
+    // If escalation is recommended and points to a different mode,
+    // emit an event and update currentMode for the next submitPrompt call.
+    if (
+      escalation.shouldEscalate &&
+      escalation.recommendedMode &&
+      escalation.recommendedMode !== this.currentMode
+    ) {
+      this.emitEvent({
+        type: "mode.escalation",
+        timestamp: iso(),
+        data: {
+          from: this.currentMode,
+          to: escalation.recommendedMode,
+          reason: escalation.reason,
+          confidence: escalation.confidence,
+          triggerSignals: escalation.triggerSignals,
+        },
+      });
+
+      // Update the orchestrator's current mode so the next submitPrompt
+      // invocation uses the escalated mode.
+      this.currentMode = escalation.recommendedMode;
+    }
+
+    // Stash metrics for next turn comparison
+    this.previousMetrics = currentMetrics;
 
     return result;
   }
@@ -588,12 +666,40 @@ export class OrchestratorCore {
       });
     }
 
-    // Reclassification check (retain from original stub)
+    // ── Record outcome for the current mode execution ─────────────────
+    if (this.currentMode) {
+      this.dynamicReclassifier.recordOutcome(
+        this.currentMode,
+        this.currentMode,
+        convergeResult.success,
+      );
+    }
+
+    // ── Reclassification check ────────────────────────────────────────
     const metrics = this.buildMetrics();
+
+    // Enrich metrics with convergence-specific data
+    if (convergeResult.totalConflicts > 0) {
+      metrics.metadata = {
+        ...(metrics.metadata ?? {}),
+        convergenceConflicts: convergeResult.totalConflicts,
+      };
+    }
+
     if (this.previousMetrics && this.currentMode) {
       const escalation = this.dynamicReclassifier.reclassify(metrics, this.previousMetrics);
       if (escalation.shouldEscalate && escalation.recommendedMode && escalation.recommendedMode !== this.currentMode) {
-        this.emitEvent({ type: "mode.escalation", timestamp: iso(), data: { from: this.currentMode, to: escalation.recommendedMode, reason: escalation.reason } });
+        this.emitEvent({
+          type: "mode.escalation",
+          timestamp: iso(),
+          data: {
+            from: this.currentMode,
+            to: escalation.recommendedMode,
+            reason: escalation.reason,
+            confidence: escalation.confidence,
+            triggerSignals: escalation.triggerSignals,
+          },
+        });
         this.currentMode = escalation.recommendedMode;
       }
     }
@@ -671,6 +777,9 @@ export class OrchestratorCore {
       case ExecutionModes.AUTO: return 0;
       case ExecutionModes.DIRECT: return 0;
       case ExecutionModes.LIGHTWEIGHT_PLAN: return 1;
+      case ExecutionModes.SPEED_CAMPAIGN: return 0;
+      case ExecutionModes.MEDIUM_CAMPAIGN: return 2;
+      case ExecutionModes.HIGH_CAMPAIGN: return 4;
       case ExecutionModes.MODUS_MAXIMUS: return 4;
       default: return 0;
     }

@@ -136,6 +136,15 @@ export interface ExecutionMetrics {
   userAddedContext: boolean;
   /** Current execution mode */
   currentMode: ExecutionMode;
+  /**
+   * Optional metadata for domain-specific signals used by the
+   * DynamicReclassifier escalation engine. Known keys:
+   *   - convergenceConflicts (number): number of conflicts detected during
+   *     convergence loops (used by MEDIUM→HIGH escalation)
+   *   - verificationFailures (number): consecutive verification failures
+   *     (used by HIGH→MODUS_MAXIMUS escalation)
+   */
+  metadata?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +184,34 @@ export interface CampaignState {
     tokensUsed: number;
   }>;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// EscalationEvent
+// ---------------------------------------------------------------------------
+
+/**
+ * A record of an escalation event that occurred during execution.
+ * Used by the DynamicReclassifier to learn from past decisions
+ * and avoid oscillation or re-escalating to failed modes.
+ */
+export interface EscalationEvent {
+  /** ISO timestamp when the escalation was recommended */
+  timestamp: string;
+  /** The mode the execution was leaving */
+  fromMode: ExecutionMode;
+  /** The mode being escalated to */
+  toMode: ExecutionMode;
+  /** Confidence score at the time of escalation (0-1) */
+  confidence: number;
+  /** The trigger signals that prompted this escalation */
+  triggerSignals: string[];
+  /**
+   * Outcome of the escalated mode execution.
+   * Set by the orchestrator after the mode completes.
+   * 'unknown' while execution is in-flight.
+   */
+  outcome: 'successful' | 'failed' | 'unknown';
 }
 
 // ---------------------------------------------------------------------------
