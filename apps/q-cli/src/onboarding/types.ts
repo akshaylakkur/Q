@@ -77,6 +77,12 @@ export const PROVIDERS: ProviderEntry[] = [
     badges: "📡",
   },
   {
+    type: "ollama-cloud",
+    name: "Ollama Cloud",
+    description: "Cloud-hosted Ollama models via API key. Uses api.ollama.com.",
+    badges: "🧠📡",
+  },
+  {
     type: "openai-compatible",
     name: "OpenAI-Compatible",
     description: "Groq, Together, Fireworks, or any OpenAI-compatible endpoint.",

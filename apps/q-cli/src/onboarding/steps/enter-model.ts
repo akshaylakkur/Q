@@ -50,7 +50,7 @@ export class EnterModelStep implements WizardStep {
     lines.push(chalk.hex("#6366f1")("  ── Step 3/4 — Model Setup ──"));
     lines.push("");
 
-    const isOllama = state.provider?.type === "ollama";
+    const isOllamaLocal = state.provider?.type === "ollama";
 
     // Show the provider badge
     const providerName = state.provider?.name ?? "Unknown";
@@ -64,12 +64,12 @@ export class EnterModelStep implements WizardStep {
       } else {
         lines.push("  " + chalk.bold("Model name"));
       }
-      const modelInput = this.modelBuffer.join("") || chalk.dim(isOllama ? "(e.g. llama3.2, mistral, deepseek-r1)" : "(e.g. claude-sonnet-4-20250514, gpt-4o)");
+      const modelInput = this.modelBuffer.join("") || chalk.dim(isOllamaLocal ? "(e.g. llama3.2, mistral, deepseek-r1)" : "(e.g. claude-sonnet-4-20250514, gpt-4o)");
       lines.push(`    ${modelInput}`);
       lines.push("");
 
-      // ── API key input (only for non-Ollama providers) ──
-      if (!isOllama) {
+      // ── API key input (only for providers that need one) ──
+      if (!isOllamaLocal) {
         if (this.focusField === "apikey") {
           lines.push(chalk.hex("#6366f1")("▸ ") + chalk.bold("API key"));
         } else {
@@ -164,8 +164,8 @@ export class EnterModelStep implements WizardStep {
 
     // Tab to switch fields
     if (key === "\t") {
-      const isOllama = state.provider?.type === "ollama";
-      if (isOllama) {
+      const isOllamaLocal = state.provider?.type === "ollama";
+      if (isOllamaLocal) {
         // Only one field for Ollama — Tab does nothing meaningful, but Enter submits
         return "stay";
       }
@@ -184,8 +184,8 @@ export class EnterModelStep implements WizardStep {
       // Store model in state
       state.model = modelName;
 
-      const isOllama = state.provider?.type === "ollama";
-      if (!isOllama) {
+      const isOllamaLocal = state.provider?.type === "ollama";
+      if (!isOllamaLocal) {
         const apiKey = this.apiKeyBuffer.join("").trim();
         if (!apiKey) return "stay";
         state.credentials = { apiKey };
@@ -242,8 +242,8 @@ export class EnterModelStep implements WizardStep {
 
     try {
       const modelName = this.modelBuffer.join("").trim();
-      const isOllama = state.provider?.type === "ollama";
-      const apiKey = isOllama ? "" : this.apiKeyBuffer.join("").trim();
+      const isOllamaLocal = state.provider?.type === "ollama";
+      const apiKey = isOllamaLocal ? "" : this.apiKeyBuffer.join("").trim();
 
       const provider = ProviderFactory.create(
         state.provider!.type,

@@ -228,11 +228,12 @@ async function checkProviders(config: VConfig | null): Promise<CheckResult[]> {
 
     const baseUrl = provider.baseUrl || "";
     const apiKey = provider.apiKey;
-    const isOllama = name === "ollama" || name.toLowerCase().includes("ollama");
+    const isOllama = provider.type === "ollama";
+    const isOllamaCloud = provider.type === "ollama-cloud";
     const isMoonshotKimi = name.toLowerCase().includes("moonshot") || name.toLowerCase().includes("kimi");
 
     // Determine effective endpoint URL (with defaults for well-known providers)
-    const effectiveBaseUrl = baseUrl || (isOllama ? "http://localhost:11434" : "");
+    const effectiveBaseUrl = baseUrl || (isOllama ? "http://localhost:11434" : isOllamaCloud ? "https://ollama.com" : "");
 
     // Check endpoint reachability with HEAD request
     let endpointOk = false;

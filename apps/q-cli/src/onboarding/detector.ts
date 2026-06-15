@@ -53,8 +53,9 @@ function hasValidProvider(content: string): boolean {
     const providerName: string = match[1] ?? "";
     const type = extractTomlValue(content, `providers.${providerName}`, "type");
     if (!type) continue;
-    // Ollama: no API key needed — any provider with type="ollama" is valid
+    // Ollama (local): no API key needed — any provider with type="ollama" is valid
     if (type === "ollama") return true;
+    // Ollama Cloud: needs an API key like any cloud provider
     // Must have either apiKey or oauth config
     const apiKey = extractTomlValue(content, `providers.${providerName}`, "apiKey");
     const oauthSection = new RegExp(
@@ -109,7 +110,7 @@ export function checkFirstRun(
     return { needed: false };
   }
 
-  // Skip if environment variables provide a provider + model (+ key for non-Ollama)
+  // Skip if environment variables provide a provider + model (+ key for non-Ollama/local)
   if (process.env.Q_PROVIDER && process.env.Q_MODEL && (process.env.Q_API_KEY !== undefined || process.env.Q_PROVIDER === "ollama")) {
     return { needed: false };
   }

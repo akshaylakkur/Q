@@ -36,7 +36,10 @@ export function writeOnboardingConfig(state: OnboardingState): void {
   configLines.push(`apiKey = "${apiKey.replace(/"/g, '\\"')}"`);
 
   if (provider === "ollama") {
-    configLines.push(`# Ollama: no API key needed — model name is sufficient`);
+    configLines.push(`# Ollama (local): no API key needed — model name is sufficient`);
+  }
+  if (provider === "ollama-cloud") {
+    configLines.push(`# Ollama Cloud: API key is sent as Bearer token to ollama.com`);
   }
 
   configLines.push("");

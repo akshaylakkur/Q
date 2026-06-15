@@ -2,6 +2,7 @@ import type { ChatParams, ChatResponse, ModelCapability, ProviderConfig, Thinkin
 
 import {
   OllamaProvider,
+  OllamaCloudProvider,
   OpenAIProvider,
   OpenAICompatibleProvider,
   AnthropicProvider,
@@ -61,13 +62,15 @@ export class ProviderFactory {
         return new GoogleGenAIProvider(modelName, config);
       case "ollama":
         return new OllamaProvider(modelName, config);
+      case "ollama-cloud":
+        return new OllamaCloudProvider(modelName, config);
       case "kimi":
         return new KimiProvider(modelName, config);
       case "openai-compatible":
         return new OpenAICompatibleProvider(modelName, config);
       default:
         throw new Error(
-          `Unknown provider type: ${type}. Supported types: anthropic, openai, google, ollama, kimi, openai-compatible`,
+          `Unknown provider type: ${type}. Supported types: anthropic, openai, google, ollama, ollama-cloud, kimi, openai-compatible`,
         );
     }
   }
@@ -81,6 +84,7 @@ export class ProviderFactory {
       "openai",
       "google",
       "ollama",
+      "ollama-cloud",
       "kimi",
       "openai-compatible",
     ];
