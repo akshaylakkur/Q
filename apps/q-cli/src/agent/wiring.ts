@@ -64,7 +64,7 @@ export function resolveProviderConfig(workDir: string): ResolvedProviderConfig |
     try {
       accessSync(configPath, constants.R_OK);
       const cfg = readConfigToml(configPath);
-      if (cfg?.provider && cfg?.model && cfg?.apiKey) {
+      if (cfg?.provider && cfg?.model && (cfg?.apiKey || cfg?.provider === "ollama")) {
         return cfg;
       }
     } catch {
@@ -80,7 +80,7 @@ export function resolveProviderConfig(workDir: string): ResolvedProviderConfig |
   const globalConfigPath = resolve(homedir(), ".Q", "config.toml");
   if (existsSync(globalConfigPath)) {
     const cfg = readConfigToml(globalConfigPath);
-    if (cfg?.provider && cfg?.model && cfg?.apiKey) {
+    if (cfg?.provider && cfg?.model && (cfg?.apiKey || cfg?.provider === "ollama")) {
       return cfg;
     }
   }
