@@ -10,6 +10,8 @@
   "scripts": {
     "build": "pnpm --filter q-cli build && pnpm sync",
     "build:packages": "pnpm --filter \"./packages/*\" build",
+    "build:binary": "node scripts/build-sea.mjs",
+    "build:all": "pnpm build:packages && pnpm build:binary",
     "sync": "mkdir -p ~/.Q/build/apps/q-cli/dist && cp -R apps/q-cli/dist/main.mjs ~/.Q/build/apps/q-cli/dist/main.mjs && cp -R apps/q-cli/dist/main.mjs.map ~/.Q/build/apps/q-cli/dist/main.mjs.map && if [ -d packages/agent-core/dist/profiles ]; then mkdir -p ~/.Q/build/apps/q-cli/dist/profiles && cp packages/agent-core/dist/profiles/*.yaml ~/.Q/build/apps/q-cli/dist/profiles/ 2>/dev/null; fi && echo '✓ synced build to ~/.Q/build/'",
     "dev": "pnpm --filter q-cli dev",
     "typecheck": "pnpm -r typecheck",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "oxlint": "^0.16.0",
+    "postject": "1.0.0-alpha.6",
     "tsdown": "^0.22.0",
     "typescript": "^5.8.0",
     "vitest": "^4.1.0"

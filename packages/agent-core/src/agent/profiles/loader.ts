@@ -3,6 +3,10 @@
  * the extends chain, and renders system prompt templates.
  *
  * Uses a minimal custom YAML parser sufficient for our profile schema.
+ *
+ * Supports two modes:
+ *   1. **Filesystem** — Loads YAML files from a profiles directory (dev mode)
+ *   2. **Embedded** — Loads profiles from an in-memory registry (SEA binary mode)
  */
 
 import { readFileSync } from "node:fs";
@@ -39,6 +43,19 @@ export interface RenderContext {
   skillListing: string;
   profileName: string;
   [key: string]: string;
+}
+
+// ── Embedded profile registry ──────────────────────────────────────────────
+// Used in SEA binary mode where there is no filesystem to read YAML files from.
+
+const EMBEDDED_PROFILES: Record<string, string> = {};
+
+/**
+ * Register a profile YAML string in the embedded registry.
+ * Called at module load time by the profiles index.
+ */
+export function registerEmbeddedProfile(name: string, yaml: string): void {
+  EMBEDDED_PROFILES[name] = yaml;
 }
 
 /**
@@ -286,12 +303,21 @@ function yamlToRawProfile(raw: Record<string, unknown>): RawProfile {
   return profile;
 }
 
+/** Parse a YAML string into a RawProfile */
+function parseYamlString(yaml: string): RawProfile | null {
+  try {
+    const parsed = parseSimpleYaml(yaml);
+    return yamlToRawProfile(parsed);
+  } catch {
+    return null;
+  }
+}
+
 /** Load a single YAML profile file */
 function loadProfileFile(filePath: string): RawProfile | null {
   try {
     const content = readFileSync(filePath, "utf-8");
-    const parsed = parseSimpleYaml(content);
-    return yamlToRawProfile(parsed);
+    return parseYamlString(content);
   } catch {
     return null;
   }
@@ -304,13 +330,14 @@ export function loadAllProfiles(
   const dir = profileDir ?? PROFILE_DIR;
   const profiles: Record<string, RawProfile> = {};
 
+  // 1. Try loading from filesystem
   let files: string[];
   try {
     files = readdirSync(dir).filter(
       (f: string) => extname(f).toLowerCase() === ".yaml",
     );
   } catch {
-    return profiles;
+    files = [];
   }
 
   for (const file of files) {
@@ -318,6 +345,18 @@ export function loadAllProfiles(
     const profile = loadProfileFile(filePath);
     if (profile && profile.name) {
       profiles[profile.name] = profile;
+    }
+  }
+
+  // 2. Fall back to embedded profiles (for SEA binary mode)
+  //    Only use embedded if filesystem returned nothing, to allow
+  //    dev mode to still work with live YAML files.
+  if (Object.keys(profiles).length === 0 && Object.keys(EMBEDDED_PROFILES).length > 0) {
+    for (const [name, yaml] of Object.entries(EMBEDDED_PROFILES)) {
+      const profile = parseYamlString(yaml);
+      if (profile && profile.name) {
+        profiles[profile.name] = profile;
+      }
     }
   }
 

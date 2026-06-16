@@ -9,11 +9,11 @@ export default defineConfig({
     js: "#!/usr/bin/env node",
   },
   dts: false,
-  sourcemap: true,
-  minify: false,
+  sourcemap: false,
+  minify: true,
   platform: "node",
   target: "node22",
-  deps: {
-    neverBundle: ["@xenova/transformers", "typescript"],
-  },
+  // Bundle everything — no external deps.
+  // @xenova/transformers is dynamically imported and will be excluded
+  // at runtime with a graceful fallback.
 });

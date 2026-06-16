@@ -1,0 +1,35 @@
+{
+  "name": "qode",
+  "version": "0.1.0",
+  "description": "Qode — Autonomous Coding Agent. Zero-dependency binary for macOS and Windows.",
+  "bin": {
+    "qode": "./bin/qode"
+  },
+  "optionalDependencies": {
+    "@qode/darwin-arm64": "0.1.0",
+    "@qode/darwin-x64": "0.1.0",
+    "@qode/win32-x64": "0.1.0"
+  },
+  "scripts": {
+    "postinstall": "node ./scripts/install.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/akshaylakkur/Q"
+  },
+  "homepage": "https://qode.sh",
+  "keywords": [
+    "ai",
+    "coding-agent",
+    "cli",
+    "developer-tools"
+  ]
+}

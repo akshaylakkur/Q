@@ -23,6 +23,7 @@ import {
   handleAgentCommand,
 } from "./agent.js";
 import { handleQmdCommand } from "./qmd.js";
+import { handlePlanCommand } from "../plan/plan-handler.js";
 
 // =========================================================================
 // Re-exports
@@ -130,6 +131,8 @@ async function handleBuiltInSlashCommand(
       handleAgentCommand(host, args);
       return;
     case "plan":
+      handlePlanCommand(host, args);
+      return;
     case "rewind":
     case "retry":
     case "steer":

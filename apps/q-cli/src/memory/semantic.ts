@@ -91,8 +91,18 @@ export class XenovaEmbeddingModel implements EmbeddingModel {
 
   async init(): Promise<void> {
     try {
-      // Dynamic import avoids tsdown bundling the heavy package
-      const { pipeline } = await import("@xenova/transformers");
+      // Dynamic import — the package may not be present in SEA binary mode.
+      // Graceful fallback: semantic search simply won't be available.
+      let pipeline: ((...args: unknown[]) => unknown) | null = null;
+      try {
+        const mod = await import("@xenova/transformers");
+        pipeline = mod.pipeline as (...args: unknown[]) => unknown;
+      } catch {
+        // Package not available (SEA binary or not installed)
+        this._available = false;
+        this._pipeline = null;
+        return;
+      }
       this._pipeline = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
         quantized: true,
       });

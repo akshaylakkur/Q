@@ -25,8 +25,18 @@ import { readFile } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, basename, extname, dirname } from "node:path";
 import { EventEmitter } from "node:events";
-import ts from "typescript";
 import { parse as babelParse } from "@babel/parser";
+
+// Lazy TypeScript import — the typescript package has side effects on import
+// that dump enum definitions to stdout. We use a dynamic import to avoid this
+// until the first time TypeScript parsing is actually needed.
+let _ts: typeof import("typescript") | null = null;
+async function getTS(): Promise<typeof import("typescript")> {
+  if (!_ts) {
+    _ts = await import("typescript");
+  }
+  return _ts;
+}
 import type { WorkspaceTopology } from "./topology.js";
 
 
@@ -887,6 +897,8 @@ export class SyntaxCheckGate implements VerificationGate {
         switch (lang) {
           case "typescript": {
             const src = await readFile(resolved, "utf-8");
+            // Lazy-load TypeScript to avoid side effects on module import
+            const ts = await getTS();
             // Spec: "for TypeScript use ts.createSourceFile() from typescript
             // package (fast in-process parsing)". This is the primary call.
             const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true);
@@ -1026,6 +1038,7 @@ export class SyntaxCheckGate implements VerificationGate {
             if (await fileExists(resolved)) {
               try {
                 const src = await readFile(resolved, "utf-8");
+                const ts = await getTS();
                 ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true);
               } catch {
                 // not parseable — silently skip

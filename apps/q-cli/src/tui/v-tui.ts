@@ -54,6 +54,7 @@ import { StatusDashboardComponent } from "./components/status-dashboard.js";
 import { dispatchInput, ALL_SLASH_COMMANDS, sortSlashCommands, type SlashCommandHost, type QSlashCommand } from "./commands/index.js";
 import { ConfirmationDropdownComponent } from "./components/confirmation-dropdown.js";
 import { RevisionInputComponent } from "./components/revision-input.js";
+import { PlanModeController, PlanDropdownComponent, PlanRevisionInputComponent } from "./plan/index.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -120,6 +121,11 @@ export class QTui {
   private dialogComponent: (Container & import("@earendil-works/pi-tui").Focusable) | null = null;
   private savedEditorContent: string = "";
 
+  // Plan Mode state
+  private planModeController: PlanModeController;
+  /** The prompt that was entered while in plan mode (before plan generation) */
+  private planModePendingPrompt: string = "";
+
   // Modus Maximus state
   private modusMaximusCurrentStepIndex: number = -1;
   private modusMaximusPlanStatus: StatusMessageComponent | null = null;
@@ -168,6 +174,11 @@ export class QTui {
       modusMaximusPhase: "idle",
       activeAgent: "auto",
     };
+
+    // Initialize plan mode controller
+    this.planModeController = new PlanModeController();
+    this.planModeController.setSessionId(this.sessionId);
+    this.setupPlanModeController();
 
     // Create terminal
     this.terminal = new ProcessTerminal();
@@ -288,7 +299,8 @@ export class QTui {
       // We consume the event here rather than relying on pi-tui's focus
       // routing, which can be unreliable for custom Focusable components
       // mounted as editor replacements.
-      if (this.activeDialog === "confirmation" || this.activeDialog === "revision") {
+      if (this.activeDialog === "confirmation" || this.activeDialog === "revision" ||
+          this.activeDialog === "plan-confirmation" || this.activeDialog === "plan-revision") {
         // Allow Ctrl+Q (exit), Ctrl+C (interrupt with empty input) through
         if (matchesKey(data, "ctrl+q")) {
           void this.handleExitCommand();
@@ -472,6 +484,13 @@ export class QTui {
     const host = this.createSlashCommandHost();
     const handled = dispatchInput(host, text);
     if (handled) return;
+
+    // ── Plan Mode Interception ──────────────────────────────────────
+    // If plan mode is active, generate a plan first before executing.
+    if (this.appState.planMode) {
+      this.handlePlanModePrompt(text);
+      return;
+    }
 
     // Not a command — send to agent
     this.sendToAgent(text);
@@ -1060,6 +1079,205 @@ export class QTui {
       this.abortController.abort();
       this.showStatus("Cancelling...");
     }
+  }
+
+  // ── Plan Mode ──────────────────────────────────────────────────────
+
+  /**
+   * Setup the plan mode controller callbacks.
+   */
+  private setupPlanModeController(): void {
+    this.planModeController.setOnPhaseChange((phase) => {
+      // Update the editor border to reflect plan mode state
+      if (phase === "planning") {
+        this.editor.borderColor = (s: string) =>
+          chalk.hex(this.colors.warning)(s);
+      } else if (phase === "reviewing") {
+        this.editor.borderColor = (s: string) =>
+          chalk.hex(this.colors.success)(s);
+      } else if (phase === "executing") {
+        this.editor.borderColor = (s: string) =>
+          chalk.hex(this.colors.primary)(s);
+      } else {
+        this.editor.borderColor = (s: string) =>
+          chalk.hex(this.colors.border)(s);
+      }
+      this.ui.requestRender();
+    });
+
+    this.planModeController.setOnShowPlan((content, filePath) => {
+      // Show the plan as an assistant message in the transcript
+      const planHeader = "**Implementation Plan**";
+      const planContent = `${planHeader}\n\n${content}`;
+      const planComponent = new AssistantMessageComponent(this.colors);
+      planComponent.setContent(planContent);
+      this.transcriptContainer.addChild(planComponent);
+
+      // Show a status message with the file path
+      const status = new StatusMessageComponent(
+        `Plan saved to ${filePath}`,
+        this.colors,
+        "success",
+        filePath,
+      );
+      this.transcriptContainer.addChild(status);
+      this.ui.requestRender();
+    });
+
+    this.planModeController.setOnShowDropdown(() => {
+      // Show the plan confirmation dropdown
+      const dropdown = new PlanDropdownComponent(this.colors);
+      dropdown.setPlanFilePath(this.planModeController.currentPlanFilePath);
+
+      dropdown.setOnChoice((choice) => {
+        void this.handlePlanChoice(choice);
+      });
+
+      dropdown.setOnCancel(() => {
+        // Cancel = Exit plan mode
+        void this.handlePlanChoice("exit");
+      });
+
+      this.mountDialog(dropdown, "plan-confirmation");
+    });
+
+    this.planModeController.setOnShowRevisionInput(() => {
+      // Show the revision input dialog
+      const revisionInput = new PlanRevisionInputComponent(this.colors);
+
+      revisionInput.setOnSubmit((text) => {
+        void this.handlePlanRevision(text);
+      });
+
+      revisionInput.setOnCancel(() => {
+        // Cancel revision → go back to the dropdown
+        this.restoreEditor();
+        this.planModeController.setOnShowDropdown(() => {
+          const dropdown = new PlanDropdownComponent(this.colors);
+          dropdown.setPlanFilePath(this.planModeController.currentPlanFilePath);
+
+          dropdown.setOnChoice((choice) => {
+            void this.handlePlanChoice(choice);
+          });
+
+          dropdown.setOnCancel(() => {
+            void this.handlePlanChoice("exit");
+          });
+
+          this.mountDialog(dropdown, "plan-confirmation");
+        });
+        this.planModeController.setOnShowDropdown!();
+      });
+
+      this.mountDialog(revisionInput, "plan-revision");
+    });
+
+    this.planModeController.setOnRestoreEditor(() => {
+      this.restoreEditor();
+    });
+  }
+
+  /**
+   * Handle a prompt entered while in plan mode.
+   * Generates a plan, shows it, and presents the confirmation dropdown.
+   */
+  private async handlePlanModePrompt(text: string): Promise<void> {
+    // Create and add user message component to transcript
+    const userMsg = new UserMessageComponent(text, this.colors);
+    this.transcriptContainer.addChild(userMsg);
+    this.ui.requestRender();
+
+    this.planModePendingPrompt = text;
+
+    // Show a status message indicating plan generation
+    this.showStatus("Generating plan...", "info");
+
+    // Generate the plan
+    const host = this.createSlashCommandHost();
+    await this.planModeController.generatePlan(host, text);
+  }
+
+  /**
+   * Handle the user's choice from the plan confirmation dropdown.
+   * Delegates to the plan mode controller for lifecycle management.
+   */
+  private async handlePlanChoice(choice: import("./plan/index.js").PlanChoice): Promise<void> {
+    const host = this.createSlashCommandHost();
+
+    switch (choice) {
+      case "looks-good": {
+        // Restore editor first
+        this.restoreEditor();
+        // Delegate to controller (triggers onRestoreEditor callback)
+        await this.planModeController.handleChoice(host, choice);
+        // Execute the plan
+        this.showStatus("Plan accepted. Executing...", "success");
+        await this.executePlan();
+        break;
+      }
+
+      case "needs-revision": {
+        // Delegate to controller — it will trigger onShowRevisionInput callback
+        await this.planModeController.handleChoice(host, choice);
+        break;
+      }
+
+      case "redo": {
+        // Restore editor
+        this.restoreEditor();
+        // Delegate to controller
+        await this.planModeController.handleChoice(host, choice);
+        // Regenerate the plan
+        this.showStatus("Regenerating plan...", "info");
+        await this.planModeController.generatePlan(host, this.planModePendingPrompt);
+        break;
+      }
+
+      case "exit": {
+        // Restore editor
+        this.restoreEditor();
+        // Delegate to controller — it will exit plan mode
+        await this.planModeController.handleChoice(host, choice);
+        this.appState.planMode = false;
+        this.showStatus("Exiting plan mode. Executing directly...", "info");
+        // Send the original prompt to the agent
+        this.sendToAgent(this.planModePendingPrompt);
+        break;
+      }
+    }
+  }
+
+  /**
+   * Handle a revision submission from the plan revision input.
+   */
+  private async handlePlanRevision(revisionText: string): Promise<void> {
+    this.restoreEditor();
+    const host = this.createSlashCommandHost();
+    await this.planModeController.applyRevision(host, revisionText);
+  }
+
+  /**
+   * Execute the approved plan by sending it to the agent.
+   */
+  private async executePlan(): Promise<void> {
+    const prompt = this.planModePendingPrompt;
+    const planContent = this.planModeController.currentPlanContent;
+
+    // Exit plan mode
+    this.planModeController.exit();
+    this.appState.planMode = false;
+
+    // Send the plan as context and execute
+    const executionPrompt = `I have an approved plan. Please implement it step by step.
+
+Plan:
+${planContent}
+
+Original request: ${prompt}
+
+Follow the plan carefully. Complete each step before moving to the next.`;
+
+    this.sendToAgent(executionPrompt);
   }
 
   // ── Transcript Management ──────────────────────────────────────────
