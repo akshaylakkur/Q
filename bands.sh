@@ -47,7 +47,7 @@ ok "q-cli built"
 info "━━━ Syncing to ~/.Q/build/ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 mkdir -p ~/.Q/build/apps/q-cli/dist
 cp apps/q-cli/dist/main.mjs ~/.Q/build/apps/q-cli/dist/main.mjs
-cp apps/q-cli/dist/main.mjs.map ~/.Q/build/apps/q-cli/dist/main.mjs.map
+cp apps/q-cli/dist/typescript-*.mjs ~/.Q/build/apps/q-cli/dist/ 2>/dev/null || true
 
 if [ -d packages/agent-core/dist/profiles ]; then
   mkdir -p ~/.Q/build/apps/q-cli/dist/profiles
