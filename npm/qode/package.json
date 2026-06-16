@@ -1,5 +1,5 @@
 {
-  "name": "qode-agent",
+  "name": "@qode-agent/qode",
   "version": "0.1.0",
   "description": "Qode — Autonomous Coding Agent. Zero-dependency binary for macOS and Windows.",
   "bin": {

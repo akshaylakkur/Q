@@ -2,12 +2,12 @@
 /**
  * install.js — Platform detection and binary installation for qode-agent.
  *
- * This script runs after `npm install qode-agent` (or `npm install -g qode-agent`).
+ * This script runs after `npm install @qode-agent/qode` (or `npm install -g @qode-agent/qode`).
  * It detects the user's platform, finds the correct optional dependency
  * package, and symlinks/copies the binary into place.
  *
  * The platform-specific packages (@qode-agent/darwin-arm64, @qode-agent/darwin-x64,
- * @qode-agent/win32-x64) are listed as optionalDependencies in the main qode-agent
+ * @qode-agent/win32-x64) are listed as optionalDependencies in the main @qode-agent/qode
  * package. npm will install the matching one automatically.
  */
 
