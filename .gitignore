@@ -56,4 +56,5 @@ TP/
 /q-cli
 
 Q.md
-AGENTS/md
+AGENTS.md
+*.pem
