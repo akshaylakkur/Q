@@ -1,7 +1,6 @@
 {
   "name": "@q/qmain",
   "version": "0.1.0",
-  "private": true,
   "description": "Qode — Execution environment abstraction (local, SSH, Docker)",
   "type": "module",
   "main": "./dist/index.mjs",
@@ -11,6 +10,9 @@
       "import": "./dist/index.mjs",
       "types": "./dist/index.d.mts"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": ["dist/"],
   "scripts": {

@@ -6,7 +6,10 @@
   "cpu": ["x64"],
   "files": ["bin/"],
   "bin": {
-    "qode": "bin/qode"
+    "qode-agent": "bin/qode"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "license": "MIT",
   "repository": {

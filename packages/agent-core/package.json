@@ -1,7 +1,6 @@
 {
   "name": "@q/agent-core",
   "version": "0.1.0",
-  "private": true,
   "description": "Qode — Core agent engine: agent loop, tool execution, sub-agents",
   "type": "module",
   "main": "./dist/index.mjs",
@@ -11,6 +10,9 @@
       "import": "./dist/index.mjs",
       "types": "./dist/index.d.mts"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": ["dist/"],
   "scripts": {

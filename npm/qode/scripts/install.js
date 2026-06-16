@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * install.js — Platform detection and binary installation for qode.
+ * install.js — Platform detection and binary installation for qode-agent.
  *
- * This script runs after `npm install qode` (or `npm install -g qode`).
+ * This script runs after `npm install qode-agent` (or `npm install -g qode-agent`).
  * It detects the user's platform, finds the correct optional dependency
  * package, and symlinks/copies the binary into place.
  *
  * The platform-specific packages (@qode/darwin-arm64, @qode/darwin-x64,
- * @qode/win32-x64) are listed as optionalDependencies in the main qode
+ * @qode/win32-x64) are listed as optionalDependencies in the main qode-agent
  * package. npm will install the matching one automatically.
  */
 
@@ -26,7 +26,7 @@ const pkg = PLATFORM_MAP[key];
 
 if (!pkg) {
   console.error(
-    `[qode] Unsupported platform: ${key}. ` +
+    `[qode-agent] Unsupported platform: ${key}. ` +
     `Supported platforms: darwin-arm64, darwin-x64, win32-x64`
   );
   process.exit(1);
@@ -58,12 +58,12 @@ if (!existsSync(binaryPath)) {
       }
     }
     chmodSync(targetPath, 0o755);
-    console.log(`[qode] Installed binary for ${key}`);
+    console.log(`[qode-agent] Installed binary for ${key}`);
     process.exit(0);
   }
 
   console.error(
-    `[qode] Binary not found for ${key}. ` +
+    `[qode-agent] Binary not found for ${key}. ` +
     `This may happen if the optional dependency failed to install. ` +
     `Try: npm install ${pkg}`
   );
@@ -87,4 +87,4 @@ if (platform === "win32") {
 }
 
 chmodSync(targetPath, 0o755);
-console.log(`[qode] Installed binary for ${key}`);
+console.log(`[qode-agent] Installed binary for ${key}`);

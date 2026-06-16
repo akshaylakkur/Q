@@ -1,11 +1,13 @@
 {
   "name": "q-cli",
   "version": "0.1.0",
-  "private": true,
   "description": "Qode — Autonomous Coding Agent CLI",
   "type": "module",
   "bin": {
     "q-cli": "dist/main.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist/"
