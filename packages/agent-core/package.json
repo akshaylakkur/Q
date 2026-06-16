@@ -1,5 +1,5 @@
 {
-  "name": "@q/agent-core",
+  "name": "@qode-agent/agent-core",
   "version": "0.1.0",
   "description": "Qode — Core agent engine: agent loop, tool execution, sub-agents",
   "type": "module",
@@ -22,9 +22,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@q/qprovs": "workspace:*",
-    "@q/qmain": "workspace:*",
-    "@q/telemetry": "workspace:*",
+    "@qode-agent/qprovs": "workspace:*",
+    "@qode-agent/qmain": "workspace:*",
+    "@qode-agent/telemetry": "workspace:*",
     "pathe": "^2.0.0",
     "zod": "^4.3.0"
   },

@@ -6,8 +6,8 @@
  * It detects the user's platform, finds the correct optional dependency
  * package, and symlinks/copies the binary into place.
  *
- * The platform-specific packages (@qode/darwin-arm64, @qode/darwin-x64,
- * @qode/win32-x64) are listed as optionalDependencies in the main qode-agent
+ * The platform-specific packages (@qode-agent/darwin-arm64, @qode-agent/darwin-x64,
+ * @qode-agent/win32-x64) are listed as optionalDependencies in the main qode-agent
  * package. npm will install the matching one automatically.
  */
 
@@ -16,9 +16,9 @@ const { existsSync, chmodSync, copyFileSync, mkdirSync, symlinkSync } = require(
 const { join } = require("path");
 
 const PLATFORM_MAP = {
-  "darwin-arm64": "@qode/darwin-arm64",
-  "darwin-x64": "@qode/darwin-x64",
-  "win32-x64": "@qode/win32-x64",
+  "darwin-arm64": "@qode-agent/darwin-arm64",
+  "darwin-x64": "@qode-agent/darwin-x64",
+  "win32-x64": "@qode-agent/win32-x64",
 };
 
 const key = `${platform}-${arch}`;

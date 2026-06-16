@@ -36,11 +36,11 @@ Qode is a pnpm monorepo with these packages:
 
 ### Key Components
 
-**Agent Core** (`@q/agent-core`) — The runtime that manages conversation context, executes tool calls, handles permissions, and runs the turn loop. Each agent has a context memory, tool manager, permission system, and optional sub-agent hosting.
+**Agent Core** (`@qode-agent/agent-core`) — The runtime that manages conversation context, executes tool calls, handles permissions, and runs the turn loop. Each agent has a context memory, tool manager, permission system, and optional sub-agent hosting.
 
-**LLM Providers** (`@q/qprovs`) — A unified interface across multiple providers. Supports Anthropic (Claude with extended thinking), OpenAI (GPT-4/4o), Google Gemini, Ollama (local models, no API key), Kimi, and any OpenAI-compatible API. Includes retry logic, request caching, and fallback chains.
+**LLM Providers** (`@qode-agent/qprovs`) — A unified interface across multiple providers. Supports Anthropic (Claude with extended thinking), OpenAI (GPT-4/4o), Google Gemini, Ollama (local models, no API key), Kimi, and any OpenAI-compatible API. Includes retry logic, request caching, and fallback chains.
 
-**Qmain** (`@q/qmain`) — The execution environment providing connectors for file operations, shell commands, git integration, and web requests.
+**Qmain** (`@qode-agent/qmain`) — The execution environment providing connectors for file operations, shell commands, git integration, and web requests.
 
 **Orchestrator** — The central state machine that classifies intent, decomposes tasks, dispatches work to sub-agents, converges results, runs verification, and self-corrects on failures.
 

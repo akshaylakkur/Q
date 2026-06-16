@@ -1,5 +1,5 @@
 {
-  "name": "@q/telemetry",
+  "name": "@qode-agent/telemetry",
   "version": "0.1.0",
   "description": "Qode — Shared telemetry and analytics infrastructure",
   "type": "module",

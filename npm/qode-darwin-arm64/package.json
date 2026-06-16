@@ -1,5 +1,5 @@
 {
-  "name": "@qode/darwin-arm64",
+  "name": "@qode-agent/darwin-arm64",
   "version": "0.1.0",
   "description": "Qode binary for macOS ARM64 (Apple Silicon)",
   "os": ["darwin"],

@@ -1,5 +1,5 @@
 {
-  "name": "@q/qprovs",
+  "name": "@qode-agent/qprovs",
   "version": "0.1.0",
   "description": "Qode — LLM provider abstraction layer (Anthropic, OpenAI, Google, Ollama, etc.)",
   "type": "module",

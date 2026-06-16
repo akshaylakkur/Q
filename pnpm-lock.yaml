@@ -38,13 +38,13 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
-      '@q/agent-core':
+      '@qode-agent/agent-core':
         specifier: workspace:*
         version: link:../../packages/agent-core
-      '@q/qmain':
+      '@qode-agent/qmain':
         specifier: workspace:*
         version: link:../../packages/qmain
-      '@q/qprovs':
+      '@qode-agent/qprovs':
         specifier: workspace:*
         version: link:../../packages/qprovs
       '@xenova/transformers':
@@ -118,15 +118,23 @@ importers:
         specifier: ^4.22.4
         version: 4.22.4
 
+  npm/qode: {}
+
+  npm/qode-darwin-arm64: {}
+
+  npm/qode-darwin-x64: {}
+
+  npm/qode-win32-x64: {}
+
   packages/agent-core:
     dependencies:
-      '@q/qmain':
+      '@qode-agent/qmain':
         specifier: workspace:*
         version: link:../qmain
-      '@q/qprovs':
+      '@qode-agent/qprovs':
         specifier: workspace:*
         version: link:../qprovs
-      '@q/telemetry':
+      '@qode-agent/telemetry':
         specifier: workspace:*
         version: link:../telemetry
       pathe:

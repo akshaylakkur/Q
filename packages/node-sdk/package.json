@@ -1,5 +1,5 @@
 {
-  "name": "@q/node-sdk",
+  "name": "@qode-agent/node-sdk",
   "version": "0.1.0",
   "description": "Qode — SDK for extending/embedding the Qode agent",
   "type": "module",

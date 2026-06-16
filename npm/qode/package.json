@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "description": "Qode — Autonomous Coding Agent. Zero-dependency binary for macOS and Windows.",
   "bin": {
-    "qode-agent": "./bin/qode"
+    "q-cli": "./bin/qode",
+    "q": "./bin/qode"
   },
   "publishConfig": {
     "access": "public"
   },
   "optionalDependencies": {
-    "@qode/darwin-arm64": "0.1.0",
-    "@qode/darwin-x64": "0.1.0",
-    "@qode/win32-x64": "0.1.0"
+    "@qode-agent/darwin-arm64": "0.1.0",
+    "@qode-agent/darwin-x64": "0.1.0",
+    "@qode-agent/win32-x64": "0.1.0"
   },
   "scripts": {
     "postinstall": "node ./scripts/install.js"

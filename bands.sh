@@ -41,7 +41,7 @@ pnpm build:packages
 ok "Packages built"
 
 info "━━━ Building q-cli app ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-pnpm --filter q-cli build
+pnpm --filter @qode-agent/cli build
 ok "q-cli built"
 
 info "━━━ Syncing to ~/.Q/build/ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

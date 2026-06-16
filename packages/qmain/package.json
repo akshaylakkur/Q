@@ -1,5 +1,5 @@
 {
-  "name": "@q/qmain",
+  "name": "@qode-agent/qmain",
   "version": "0.1.0",
   "description": "Qode — Execution environment abstraction (local, SSH, Docker)",
   "type": "module",
