@@ -507,6 +507,22 @@ export class QTui {
             sessionId: this.sessionId,
           });
         },
+        /** Run a single-turn generation with the agent and return the response text */
+        runGeneration: async (prompt: string, systemReminder?: string): Promise<string> => {
+          // Inject a system reminder if provided
+          if (systemReminder) {
+            agent.context.appendSystemReminder(systemReminder, { kind: "system_trigger", name: "qmd-generation" });
+          }
+          const turnId = agent.turn.prompt(prompt);
+          if (turnId === null) {
+            throw new Error("Could not launch turn (another turn is active)");
+          }
+          await agent.turn.waitForCurrentTurn();
+          const messages = agent.context.messages;
+          const assistantMessages = messages.filter((m: any) => m.role === "assistant");
+          const lastAssistant = assistantMessages[assistantMessages.length - 1];
+          return lastAssistant?.content ?? "";
+        },
       },
       orchestrator: orchHost
         ? {

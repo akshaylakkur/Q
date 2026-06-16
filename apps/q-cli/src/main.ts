@@ -14,6 +14,7 @@ import { registerUpdateCommand } from "./cli/update.js";
 import { registerCompletionsCommand } from "./cli/completions.js";
 import { registerDaemonCommand } from "./cli/daemon.js";
 import { registerConnectCommand } from "./cli/connect.js";
+import { handleQmdInteractive } from "./tui/commands/qmd.js";
 import { registerProfileCommand } from "./cli/profile.js";
 import { registerPluginCommand } from "./cli/plugin.js";
 import { OrchestratorCore } from "./orchestrator/core.js";
@@ -368,8 +369,12 @@ async function startInteractiveSession(startup: {
     if (prompt === null) break;
     const trimmed = prompt.trim();
     if (trimmed.startsWith("/")) {
-      const cmd = trimmed.toLowerCase();
-      switch (cmd) {
+      // Parse command name and args
+      const spaceIdx = trimmed.indexOf(" ");
+      const cmdName = spaceIdx === -1 ? trimmed.toLowerCase() : trimmed.slice(0, spaceIdx).toLowerCase();
+      const cmdArgs = spaceIdx === -1 ? "" : trimmed.slice(spaceIdx + 1).trim();
+
+      switch (cmdName) {
         case "/exit": case "/quit": running = false; continue;
         case "/help":
           console.log(chalk.cyan("Qode Commands:"));
@@ -378,6 +383,8 @@ async function startInteractiveSession(startup: {
           console.log(chalk.dim("  /clear         Clear screen"));
           console.log(chalk.dim("  /session       Show session info"));
           console.log(chalk.dim("  /yolo          Toggle yolo mode"));
+          console.log(chalk.dim("  /qmd           Generate Q.md with project conventions"));
+          console.log(chalk.dim('  /qmd "..."     Generate Q.md with additional instructions'));
           console.log();
           continue;
         case "/clear": console.clear(); continue;
@@ -388,6 +395,9 @@ async function startInteractiveSession(startup: {
         case "/yolo":
           agent.permission.setMode("yolo");
           console.log(chalk.green("✓ YOLO mode enabled"));
+          continue;
+        case "/qmd":
+          await handleQmdInteractive(agent, startup.projectRoot, cmdArgs);
           continue;
         default: console.log(chalk.yellow(`Unknown command: ${trimmed}`)); continue;
       }

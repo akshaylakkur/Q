@@ -325,6 +325,15 @@ export const ALL_SLASH_COMMANDS = [
 
   // ── Category 7: Configuration & System ─────────────────────────────
   {
+    name: "qmd",
+    aliases: ["project-rules", "conventions"],
+    description: "Generate a Q.md file with project conventions, rules, and guidelines via LLM analysis",
+    category: "system" as CommandCategory,
+    priority: 82,
+    availability: "always" as const,
+    usage: "/qmd [\"<instructions>\"]",
+  },
+  {
     name: "config",
     aliases: ["settings", "prefs"],
     description: "Open TUI settings: theme, editor, permissions, defaults",

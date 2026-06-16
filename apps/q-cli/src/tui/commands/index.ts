@@ -22,6 +22,7 @@ import {
   handleModeCommand,
   handleAgentCommand,
 } from "./agent.js";
+import { handleQmdCommand } from "./qmd.js";
 
 // =========================================================================
 // Re-exports
@@ -33,6 +34,7 @@ export * from "./registry.js";
 export * from "./resolve.js";
 export * from "./core.js";
 export * from "./agent.js";
+export * from "./qmd.js";
 
 // =========================================================================
 // Dispatch — main entry point
@@ -172,6 +174,9 @@ async function handleBuiltInSlashCommand(
       return;
 
     // Category 7: System
+    case "qmd":
+      await handleQmdCommand(host, args);
+      return;
     case "config":
     case "theme":
     case "plugin":

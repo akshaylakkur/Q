@@ -86,6 +86,8 @@ export interface SlashCommandHost {
     };
     /** Apply a named agent profile to the active agent */
     applyProfile?(profileName: string): void;
+    /** Run a single-turn generation with the agent and return the response text */
+    runGeneration?(prompt: string, systemReminder?: string): Promise<string>;
   };
 
   // Orchestrator access (for mode switching etc.)

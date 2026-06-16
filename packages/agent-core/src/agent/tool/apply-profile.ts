@@ -5,9 +5,14 @@
  * (cwd, model, session id, etc.), stores it on `agent.config`, and
  * activates the profile's tool list on `agent.tools`.
  *
- * This is the single entry point that wires a profile's "what tools are
- * available" and "what should the system prompt say" into a real Agent.
+ * Also checks for a `Q.md` or `AGENTS.md` file in the working directory
+ * and appends its content as a project-level system reminder, so that
+ * project-specific conventions and guidelines are always available to
+ * the agent.
  */
+
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 import {
   loadAllProfiles,
@@ -49,12 +54,41 @@ export function applyAgentProfile(
     toolDescriptions,
     skillListing: context?.skillListing ?? "",
   };
-  const systemPrompt = renderer.render(renderContext);
+  let systemPrompt = renderer.render(renderContext);
+
+  // ── Inject Q.md / AGENTS.md content if present ────────────────────
+  const projectRules = loadProjectRules(agent.config.cwd);
+  if (projectRules) {
+    systemPrompt += `\n\n# ── PROJECT RULES (from ${projectRules.source}) ──────────────────────\n${projectRules.content}\n`;
+  }
 
   agent.config.update({ systemPrompt, profileName });
   agent.tools.setActiveTools(profile.tools);
 
   return systemPrompt;
+}
+
+/**
+ * Load project-level rules from Q.md or AGENTS.md in the given directory.
+ * Returns the content and source filename, or null if neither file exists.
+ */
+function loadProjectRules(
+  cwd: string,
+): { source: string; content: string } | null {
+  for (const filename of ["Q.md", "AGENTS.md"]) {
+    const filePath = resolve(cwd, filename);
+    if (existsSync(filePath)) {
+      try {
+        const content = readFileSync(filePath, "utf-8").trim();
+        if (content) {
+          return { source: filename, content };
+        }
+      } catch {
+        // Ignore read errors — file might be locked or unreadable
+      }
+    }
+  }
+  return null;
 }
 
 /** Build a markdown list of tool descriptions for the active tool set. */
