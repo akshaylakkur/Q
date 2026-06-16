@@ -18,7 +18,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
-import type { WizardStep } from "./types.js";
+import type { WizardStep, StepResult } from "./types.js";
 import { createDefaultState, cloneState, type OnboardingState } from "./types.js";
 import { WelcomeStep } from "./steps/welcome.js";
 import { SelectProviderStep } from "./steps/select-provider.js";
@@ -295,65 +295,101 @@ export class OnboardingWizard {
 
   /**
    * Wait for a single keypress event from stdin.
+   * Handles paste events by feeding each character individually to the step.
    */
   private waitForInput(step: WizardStep): Promise<ProcessedResult> {
     return new Promise((resolvePromise) => {
       const handler = (data: Buffer) => {
-        const key = data.toString();
+        const raw = data.toString();
 
         // Handle Ctrl+C
-        if (key === "\x03") {
+        if (raw === "\x03") {
           resolvePromise({ action: "exit" });
           return;
         }
 
-        const resultOrPromise = step.handleInput(key, this.state);
-
-        // Handle async handleInput (e.g. EnterModelStep runs validation)
-        if (resultOrPromise instanceof Promise) {
-          resultOrPromise.then((result) => {
-            // Handle special jump encoding from ConfirmationStep
-            if (typeof result === "string" && result.startsWith("jump:")) {
-              const targetStep = parseInt(result.split(":")[1] ?? "", 10);
-              if (!isNaN(targetStep) && targetStep >= 0 && targetStep < this.steps.length) {
-                this.backtrack();
-                resolvePromise({ action: "jump", targetStep });
-                return;
-              }
-              resolvePromise({ action: "stay" });
-              return;
-            }
-
-            if (result === "next") resolvePromise({ action: "next" });
-            else if (result === "prev") resolvePromise({ action: "prev" });
-            else if (result === "exit") resolvePromise({ action: "exit" });
-            else resolvePromise({ action: "stay" });
-          });
-          return;
-        }
-
-        const result = resultOrPromise;
-
-        // Handle special jump encoding from ConfirmationStep
-        if (typeof result === "string" && result.startsWith("jump:")) {
-          const targetStep = parseInt(result.split(":")[1] ?? "", 10);
-          if (!isNaN(targetStep) && targetStep >= 0 && targetStep < this.steps.length) {
-            this.backtrack();
-            resolvePromise({ action: "jump", targetStep });
-            return;
-          }
-          resolvePromise({ action: "stay" });
-          return;
-        }
-
-        if (result === "next") resolvePromise({ action: "next" });
-        else if (result === "prev") resolvePromise({ action: "prev" });
-        else if (result === "exit") resolvePromise({ action: "exit" });
-        else resolvePromise({ action: "stay" });
+        // Feed each character individually so paste works
+        this.processChars(step, raw, resolvePromise);
       };
 
       this.stdin.once("data", handler);
     });
+  }
+
+  /**
+   * Process one or more characters through the step's handleInput,
+   * grouping escape sequences (arrow keys, etc.) so they aren't
+   * split into individual characters, while still handling paste
+   * by feeding printable characters one at a time.
+   */
+  private processChars(
+    step: WizardStep,
+    chars: string,
+    resolvePromise: (result: ProcessedResult) => void,
+  ): void {
+    let i = 0;
+    const next = () => {
+      if (i >= chars.length) {
+        resolvePromise({ action: "stay" });
+        return;
+      }
+
+      // Collect a complete escape sequence (starts with \x1b)
+      let seq: string;
+      if (chars[i] === "\x1b" && i + 2 < chars.length) {
+        // CSI sequences: ESC [ <char>  or  ESC [ <digit> ; <digit> <char>
+        seq = chars.slice(i, i + 3);
+        i += 3;
+        // Some sequences are longer (e.g. ESC [ 1 ; 5 A for Ctrl+arrow)
+        while (i < chars.length && !/[A-Z~]$/i.test(seq) && chars[i] !== "\x1b") {
+          seq += chars[i];
+          i++;
+        }
+      } else {
+        // Single character (printable, newline, tab, backspace, etc.)
+        seq = chars[i]!;
+        i++;
+      }
+
+      const resultOrPromise = step.handleInput(seq, this.state);
+
+      if (resultOrPromise instanceof Promise) {
+        resultOrPromise.then((result) => this.resolveActionResult(result, resolvePromise));
+        return;
+      }
+
+      const result = resultOrPromise;
+      if (result === "stay") {
+        next();
+      } else {
+        this.resolveActionResult(result, resolvePromise);
+      }
+    };
+    next();
+  }
+
+  /**
+   * Resolve a step action, handling jump encoding.
+   */
+  private resolveActionResult(
+    result: StepResult | "exit",
+    resolvePromise: (result: ProcessedResult) => void,
+  ): void {
+    if (typeof result === "string" && result.startsWith("jump:")) {
+      const targetStep = parseInt(result.split(":")[1] ?? "", 10);
+      if (!isNaN(targetStep) && targetStep >= 0 && targetStep < this.steps.length) {
+        this.backtrack();
+        resolvePromise({ action: "jump", targetStep });
+        return;
+      }
+      resolvePromise({ action: "stay" });
+      return;
+    }
+
+    if (result === "next") resolvePromise({ action: "next" });
+    else if (result === "prev") resolvePromise({ action: "prev" });
+    else if (result === "exit") resolvePromise({ action: "exit" });
+    else resolvePromise({ action: "stay" });
   }
 
   /**

@@ -34,7 +34,7 @@ export class ConfirmationStep implements WizardStep {
     lines.push("");
     lines.push(this.renderActions());
     lines.push("");
-    lines.push(chalk.dim("  ←/→ select action  ·  Enter confirm  ·  Esc back"));
+    lines.push(chalk.dim("  ↑/↓ navigate  ·  Enter confirm  ·  Esc back"));
 
     return lines.join("\n");
   }
@@ -109,14 +109,14 @@ export class ConfirmationStep implements WizardStep {
   handleInput(key: string, _state: OnboardingState): StepResult {
     if (key === "") return "prev";
 
-    // Navigate actions
-    if (key === "[C" || key === "[D") {
+    // Navigate actions with up/down arrows
+    if (key === "[A" || key === "[B") {
       const actions: Array<"confirm" | "change" | "cancel"> = ["confirm", "change", "cancel"];
       const idx = actions.indexOf(this.actionSelected);
-      if (key === "[C" && idx < actions.length - 1) {
+      if (key === "[B" && idx < actions.length - 1) {
         this.actionSelected = actions[idx + 1] as "confirm" | "change" | "cancel";
       }
-      if (key === "[D" && idx > 0) {
+      if (key === "[A" && idx > 0) {
         this.actionSelected = actions[idx - 1] as "confirm" | "change" | "cancel";
       }
       return "stay";
