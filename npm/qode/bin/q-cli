@@ -8,7 +8,18 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks to get the real package directory
+# This handles npm global installs where bin/q-cli is a symlink
+# e.g. /opt/homebrew/bin/q-cli -> ../lib/node_modules/qode-agent/bin/q-cli
+SCRIPT_SRC="${BASH_SOURCE[0]}"
+# Follow symlinks to the real file location
+while [ -h "$SCRIPT_SRC" ]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SRC")" && pwd)"
+  SCRIPT_SRC="$(readlink "$SCRIPT_SRC")"
+  # If the symlink target is relative, resolve it relative to the symlink's directory
+  [[ "$SCRIPT_SRC" != /* ]] && SCRIPT_SRC="$SCRIPT_DIR/$SCRIPT_SRC"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SRC")" && pwd)"
 PKG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Try to find the @qode-agent/cli main.mjs in various locations
