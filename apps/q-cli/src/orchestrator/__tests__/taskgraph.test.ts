@@ -36,7 +36,7 @@ describe("Types", () => {
   it("TaskGraphNode can be constructed with all fields", () => {
     const node: import("../taskgraph.js").TaskGraphNode = {
       id: "task-1",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Implement changes",
       dependsOn: ["task-0"],
       priority: 10,
@@ -115,7 +115,7 @@ describe("Decomposition — basic", () => {
     const graph = decomposer.decompose(profile);
     const wave0Tasks = graph.nodes.filter((n) => n.wave === 0);
     expect(wave0Tasks.length).toBeGreaterThanOrEqual(1);
-    expect(wave0Tasks.some((n) => n.profile === "explore")).toBe(true);
+    expect(wave0Tasks.some((n) => n.profile === "searchius")).toBe(true);
   });
 });
 
@@ -156,7 +156,7 @@ describe("Wave assignment", () => {
     const graph = decomposer.decompose(makeProfile({ requiresVerification: true }));
     const wave3Tasks = graph.nodes.filter((n) => n.wave === 3);
     expect(wave3Tasks.length).toBeGreaterThanOrEqual(1);
-    expect(wave3Tasks.some((n) => n.profile === "test-gen")).toBe(true);
+    expect(wave3Tasks.some((n) => n.profile === "editius")).toBe(true);
   });
 
   it("validate tasks go to wave 5", () => {
@@ -182,24 +182,24 @@ describe("Profile assignment", () => {
   it("research tasks get explore profile", () => {
     const graph = decomposer.decompose(makeProfile());
     const research = graph.nodes.find((n) => n.wave === 0);
-    expect(research?.profile).toBe("explore");
+    expect(research?.profile).toBe("searchius");
   });
 
   it("implement tasks get rewriter profile", () => {
     const graph = decomposer.decompose(makeProfile());
     const implement = graph.nodes.find((n) => n.wave === 2);
-    expect(implement?.profile).toBe("rewriter");
+    expect(implement?.profile).toBe("rewritius");
   });
 
   it("test tasks get test-gen profile", () => {
     const graph = decomposer.decompose(makeProfile({ requiresVerification: true, depth: "moderate" }));
-    const testTask = graph.nodes.find((n) => n.profile === "test-gen");
+    const testTask = graph.nodes.find((n) => n.profile === "editius");
     expect(testTask).toBeDefined();
   });
 
   it("validate tasks get validator profile", () => {
     const graph = decomposer.decompose(makeProfile({ requiresVerification: true }));
-    const validatorTask = graph.nodes.find((n) => n.profile === "validator");
+    const validatorTask = graph.nodes.find((n) => n.profile === "searchius");
     expect(validatorTask).toBeDefined();
   });
 });

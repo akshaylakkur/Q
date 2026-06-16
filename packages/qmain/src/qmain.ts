@@ -1,7 +1,7 @@
 import type { ExecResult, ProcessHandle } from "./types.js";
 
 /**
- * Kaos — Abstract execution environment interface.
+ * Qmain — Abstract execution environment interface.
  *
  * Provides file operations, process execution, and path
  * manipulation abstracted over local, SSH, Docker, etc.

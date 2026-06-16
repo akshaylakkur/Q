@@ -1,3 +1,11 @@
+/**
+ * @q/qprovs — Core type definitions for the LLM provider abstraction layer.
+ *
+ * Defines the message formats, parameters, responses, and capability
+ * metadata used across all provider adapters (Anthropic, OpenAI, Google,
+ * Ollama, etc.).
+ */
+
 /** A message in the chat conversation sent to the LLM */
 export interface ChatMessage {
   role: "user" | "assistant" | "system" | "tool";
@@ -44,17 +52,20 @@ export interface ChatResponse {
   streamTiming?: StreamTiming;
 }
 
+/** An assistant-role message returned by the LLM */
 export interface AssistantMessage {
   role: "assistant";
   content: string;
 }
 
+/** A tool call requested by the LLM */
 export interface ToolCall {
   id: string;
   name: string;
   args: Record<string, unknown>;
 }
 
+/** Reason why the LLM finished generating */
 export type FinishReason =
   | "completed"
   | "tool_use"
@@ -63,6 +74,7 @@ export type FinishReason =
   | "paused"
   | "unknown";
 
+/** Token usage statistics for an LLM request */
 export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
@@ -70,6 +82,7 @@ export interface TokenUsage {
   cacheWriteTokens?: number;
 }
 
+/** Timing metrics for streaming responses */
 export interface StreamTiming {
   firstTokenMs: number;
   totalMs: number;

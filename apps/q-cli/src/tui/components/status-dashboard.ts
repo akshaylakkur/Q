@@ -190,117 +190,16 @@ export class StatusDashboardComponent extends Container implements Focusable {
       accent: ChalkInstance;
     },
   ): string[] {
-    const { dim, text, textBright, success, warning, error, info, accent } = colors;
+    const { dim, textBright, success, info, accent } = colors;
     const mode = state.executionMode ?? "";
 
-    // ── Speed Campaign ───────────────────────────────────────────────
-    if (mode.startsWith("speed-campaign")) {
-      const completed = state.campaignCompletedCount ?? 0;
-      const total = state.campaignSubTaskCount ?? 0;
-      const progress = state.campaignProgress ?? (total > 0 ? Math.round((completed / total) * 100) : 0);
-      const phase = state.campaignPhase ?? "dispatched";
+    // ── Modus Maximus ────────────────────────────────────────────────
+    if (mode.startsWith("modus-maximus")) {
+      const phase = state.modusMaximusPhase ?? "idle";
 
       const lines: string[] = [];
-      lines.push(`  ${accent("⚡")}  ${chalk.bold("Speed Campaign")}`);
-      lines.push(`    ${dim("Phase:")}      ${textBright(phase)}`);
-
-      if (total > 0) {
-        const ratioColor = completed >= total ? success : warning;
-        lines.push(`    ${dim("Sub-tasks:")}  ${ratioColor(`${completed} / ${total}`)}`);
-        const barWidth = Math.min(36, 40);
-        const bar = renderProgressBar(progress, barWidth);
-        const barColor = progress >= 100 ? success : progress > 50 ? warning : text;
-        lines.push(`    ${dim("Progress:")}   ${barColor(bar)} ${barColor(`${progress}%`)}`);
-      } else {
-        lines.push(`    ${dim("Sub-tasks:")}  ${dim("awaiting dispatch...")}`);
-      }
-
-      lines.push("");
-      return lines;
-    }
-
-    // ── Medium Campaign ──────────────────────────────────────────────
-    if (mode.startsWith("medium-campaign")) {
-      const phase = state.campaignPhase ?? "initializing";
-      const convergence = state.campaignConvergenceCount ?? 0;
-      const gateStatus = state.campaignGateStatus;
-      const progress = state.campaignProgress ?? 0;
-
-      const lines: string[] = [];
-      lines.push(`  ${info("◈")}  ${chalk.bold("Medium Campaign")}`);
-      lines.push(`    ${dim("Wave/Phase:")}  ${textBright(phase)}`);
-
-      const convergenceColor = convergence > 0 ? success : dim;
-      lines.push(`    ${dim("Convergence:")} ${convergenceColor(`${convergence} cycle${convergence !== 1 ? "s" : ""}`)}`);
-
-      // Gate status with color coding
-      if (gateStatus) {
-        const gateColor =
-          gateStatus === "pass" || gateStatus === "passed"
-            ? success
-            : gateStatus === "fail" || gateStatus === "failed"
-              ? error
-              : gateStatus === "running" || gateStatus === "pending"
-                ? warning
-                : text;
-        lines.push(`    ${dim("Gate:")}       ${gateColor(gateStatus)}`);
-      } else {
-        lines.push(`    ${dim("Gate:")}       ${dim("pending")}`);
-      }
-
-      // Show overall progress bar
-      if (progress > 0) {
-        const barWidth = Math.min(36, 40);
-        const bar = renderProgressBar(progress, barWidth);
-        const barColor = progress >= 100 ? success : progress > 50 ? warning : text;
-        lines.push(`    ${dim("Progress:")}   ${barColor(bar)} ${barColor(`${progress}%`)}`);
-      }
-
-      lines.push("");
-      return lines;
-    }
-
-    // ── High Campaign ────────────────────────────────────────────────
-    if (mode.startsWith("high-campaign")) {
-      const cycleCount = state.campaignConvergenceCount ?? 0;
-      const filesChanged = state.campaignFilesChanged ?? 0;
-      const verificationStatus = state.campaignVerificationStatus;
-      const progress = state.campaignProgress ?? 0;
-      const phase = state.campaignPhase ?? "converging";
-
-      const lines: string[] = [];
-      lines.push(`  ${accent("⟁")}  ${chalk.bold("High Campaign")}`);
-      lines.push(`    ${dim("Phase:")}            ${textBright(phase)}`);
-
-      const cycleColor = cycleCount > 0 ? success : dim;
-      lines.push(`    ${dim("Convergence:")}      ${cycleColor(`${cycleCount} cycle${cycleCount !== 1 ? "s" : ""}`)}`);
-
-      const filesColor = filesChanged > 0 ? info : dim;
-      lines.push(`    ${dim("Files changed:")}    ${filesColor(String(filesChanged))}`);
-
-      // Verification status with color coding
-      if (verificationStatus) {
-        const verifyColor =
-          verificationStatus === "passing"
-            ? success
-            : verificationStatus === "failing"
-              ? error
-              : verificationStatus === "running"
-                ? warning
-                : text;
-        lines.push(`    ${dim("Verification:")}     ${verifyColor(verificationStatus)}`);
-      } else {
-        lines.push(`    ${dim("Verification:")}     ${dim("not started")}`);
-      }
-
-      // Show overall progress bar
-      if (progress > 0) {
-        const barWidth = Math.min(36, 40);
-        const bar = renderProgressBar(progress, barWidth);
-        const barColor = progress >= 100 ? success : progress > 50 ? warning : text;
-        lines.push(`    ${dim("Progress:")}        ${barColor(bar)} ${barColor(`${progress}%`)}`);
-      }
-
+      lines.push(`  ${accent("◆")}  ${chalk.bold("Modus Maximus")}`);
+      lines.push(`    ${dim("Phase:")}  ${textBright(phase)}`);
       lines.push("");
       return lines;
     }

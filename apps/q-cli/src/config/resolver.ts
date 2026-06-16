@@ -34,6 +34,9 @@ export interface ResolvedConfig {
 
 /**
  * Walk up from cwd to find the nearest `.q/config.toml`.
+ *
+ * @param cwd - The directory to start searching from
+ * @returns The path to the project config file, or null if not found
  */
 export function findProjectConfig(cwd: string): string | null {
   let current = resolve(cwd);

@@ -57,7 +57,7 @@ export interface SnapshotHandle {
 }
 
 /**
- * FileConnector — Higher-level file operations built on top of a Kaos instance.
+ * FileConnector — Higher-level file operations built on top of a Qmain instance.
  *
  * Provides read, write, edit, glob, grep, stat, mkdir, copy, move, delete,
  * and snapshot/rollback operations.
@@ -166,7 +166,7 @@ export class FileConnector {
    * Delete a file or directory.
    */
   async delete(path: string): Promise<void> {
-    // Use exec for recursive rm since Kaos doesn't have rm
+    // Use exec for recursive rm since Qmain doesn't have rm
     const st = await this.qmain.stat(path);
     if (st.isDir) {
       await this.qmain.exec(`rm -rf ${shellQuote(path)}`);

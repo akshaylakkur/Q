@@ -520,7 +520,7 @@ describe("Step 31 — SelfCorrectionCycle", () => {
             relatedFiles: [],
             rationale: "Syntax error",
           },
-          profile: "reviewer",
+          profile: "searchius",
           changedFiles: ["/fixed/file.ts"],
           changeSummary: "Fixed syntax",
           passed: false,

@@ -8,10 +8,10 @@
  * to only what is relevant to the target module + its direct dependencies,
  * then injects the result into the sub-agent's context before its first turn.
  *
- * Depends on: Steps 19 (WorkspaceTopology), 24 (EpisodicRecall),
- * 25 (LTPM), 26 (CodebaseGraphIndex), 28 (MemoryCoordinator).
- * Consumed by: Step 15 (PoolManager — when dispatching a task, builds the
- * slice before calling spawn()).
+ * Depends on: WorkspaceTopology, EpisodicRecall (Step 24),
+ * LTPM (Step 25), CodebaseGraphIndex (Step 26), MemoryCoordinator (Step 28).
+ * Consumed by: PoolManager — when dispatching a task, builds the
+ * slice before calling spawn().
  */
 
 import type { Agent } from "@q/agent-core";
@@ -72,7 +72,7 @@ export class MemorySliceBuilder {
   /**
    * Build a scoped memory slice for a sub-agent.
    *
-   * @param agentProfile - The profile name of the target agent (e.g. "rewriter")
+   * @param agentProfile - The profile name of the target agent (e.g. "rewritius")
    * @param task - The TaskGraphNode being dispatched
    * @param topology - The workspace topology (WorkspaceTopology instance)
    * @param memoryCoordinator - The memory coordinator (Step 28)
@@ -361,7 +361,7 @@ export class MemorySliceBuilder {
    *
    * In the real flow, this reads from the completed task results map.
    * Here we return a placeholder string — the full integration with the
-   * DAG execution results happens in Step 15 (PoolManager).
+   * DAG execution results happens in PoolManager.
    */
   private collectDependencyResults(task: TaskGraphNode): string {
     if (!task.dependsOn || task.dependsOn.length === 0) {

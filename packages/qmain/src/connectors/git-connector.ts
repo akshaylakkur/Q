@@ -62,9 +62,9 @@ export interface GitConnectorOptions {
 }
 
 /**
- * GitConnector — Git operations built on top of a Kaos instance.
+ * GitConnector — Git operations built on top of a Qmain instance.
  *
- * Uses the git CLI via Kaos.exec() for all operations,
+ * Uses the git CLI via Qmain.exec() for all operations,
  * avoiding a direct dependency on the simple-git library.
  */
 export class GitConnector {
@@ -273,7 +273,7 @@ export class GitConnector {
   }
 
   /**
-   * Execute a git command via Kaos.
+   * Execute a git command via Qmain.
    */
   private async gitExec(args: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const gitCmd = `${this.gitBinary} ${args}`;

@@ -1,5 +1,5 @@
 /**
- * SelfCorrectionCycle — Automated Fix → Re-Verify Loop (Step 21)
+ * SelfCorrectionCycle — Automated Fix → Re-Verify Loop (Step 31)
  *
  * 4-step correction protocol:
  *   1. COLLECT_DIAGNOSTIC  — Extract error details + workspace snapshot
@@ -7,9 +7,9 @@
  *   3. CORRECT             — Dispatch targeted fix based on classification
  *   4. RE_VERIFY           — Re-run gates up to and including the failed gate
  *
- * Consumed by OrchestratorCore (Step 17) during the "correcting" state.
- * Depends on VerificationPipeline (Step 20) for re-verification,
- * ConvergenceEngine (Step 18) for re-merge, and pool profiles for dispatch.
+ * Consumed by OrchestratorCore during the "correcting" state.
+ * Depends on VerificationPipeline for re-verification,
+ * ConvergenceEngine for re-merge, and pool profiles for dispatch.
  */
 
 import { readFile, writeFile, readdir } from "node:fs/promises";
@@ -56,10 +56,9 @@ export type EscalationOption =
 
 /** Agent profile dispatched for correction. */
 export type CorrectionProfile =
-  | "reviewer"
-  | "architect"
-  | "rewriter"
-  | "test-gen";
+  | "searchius"
+  | "rewritius"
+  | "editius";
 
 /** Type of correction handler used. */
 export type CorrectionHandlerType =
@@ -772,9 +771,9 @@ export class SyntaxCorrectionHandler {
         try {
           const prompt = `Fix the syntax error at ${diag.filePath}:${diag.line}:${diag.column}. Error: ${diag.errorMessage}. Only edit this single line or the minimal surrounding context. Do NOT add explanatory comments.`;
 
-          // Use "rewriter" profile (not "reviewer") because the sub-agent
+          // Use "editius" profile because the sub-agent
           // needs Write tool access to edit the file.
-          const result = await this.config.subagentHost.spawn("rewriter", prompt, { signal });
+          const result = await this.config.subagentHost.spawn("editius", prompt, { signal });
 
           changedFiles.push(diag.filePath);
 
@@ -927,9 +926,9 @@ Only edit the minimal context needed to fix these errors. Do not add explanatory
 After editing, verify with: the lint command.`;
 
         try {
-          // Use "rewriter" profile (not "reviewer") because the sub-agent
+          // Use "editius" profile because the sub-agent
           // needs Write tool access to edit the file and Bash to re-lint.
-          const result = await this.config.subagentHost.spawn("rewriter", prompt, { signal });
+          const result = await this.config.subagentHost.spawn("editius", prompt, { signal });
 
           changedFiles.push(filePath);
           for (const d of fileDiags) {
@@ -1125,7 +1124,7 @@ ${typeDefinitionContext ? `Relevant type definitions found in the codebase:\n${t
 Use Glob or Grep to find type definitions if needed. Only edit the minimal context needed to fix the type error. Do not add explanatory comments or change logic.`;
 
         try {
-          const result = await this.config.subagentHost.spawn("rewriter", prompt, { signal });
+          const result = await this.config.subagentHost.spawn("editius", prompt, { signal });
 
           changedFiles.push(diag.filePath);
           appendCorrectionRecord(this.config.wirePath, {
@@ -1259,8 +1258,8 @@ Do NOT modify test files. Only edit the implementation files listed above.`;
 
       if (this.config.subagentHost) {
         agentPromises.push(
-          this.config.subagentHost.spawn("rewriter", implPrompt, { signal })
-            .then((r) => ({ ...r, profile: "rewriter", targetFile: implFiles[0]?.filePath ?? "" }))
+          this.config.subagentHost.spawn("editius", implPrompt, { signal })
+            .then((r) => ({ ...r, profile: "editius", targetFile: implFiles[0]?.filePath ?? "" }))
             .catch(() => null),
         );
       }
@@ -1280,8 +1279,8 @@ Only edit the test files listed above. Do NOT modify implementation files.`;
 
       if (this.config.subagentHost) {
         agentPromises.push(
-          this.config.subagentHost.spawn("test-gen", testPrompt, { signal })
-            .then((r) => ({ ...r, profile: "test-gen", targetFile: testFiles[0]?.filePath ?? "" }))
+          this.config.subagentHost.spawn("editius", testPrompt, { signal })
+            .then((r) => ({ ...r, profile: "editius", targetFile: testFiles[0]?.filePath ?? "" }))
             .catch(() => null),
         );
       }
@@ -1326,7 +1325,7 @@ Only edit the test files listed above. Do NOT modify implementation files.`;
       // Sort by violations ascending, then by profile priority (rewriter > test-gen)
       scored.sort((a, b) => {
         if (a.violations !== b.violations) return a.violations - b.violations;
-        return a.profile === "rewriter" ? -1 : 1;
+        return a.profile === "editius" ? -1 : 1;
       });
       chosenResult = scored[0]!;
     }
@@ -2055,19 +2054,19 @@ export class SelfCorrectionCycle {
   private resolveProfile(classification: FailureClassification): CorrectionProfile {
     const { type, scope, rootCause } = classification;
 
-    if (type === "test_failure") return "test-gen";
+    if (type === "test_failure") return "editius";
 
-    if (type === "architecture") return "architect";
+    if (type === "architecture") return "rewritius";
 
-    if (type === "syntax" || type === "lint") return "reviewer";
+    if (type === "syntax" || type === "lint") return "searchius";
 
     if (type === "type") {
-      if (scope === "per_file") return "reviewer";
-      if (scope === "cross_file") return "architect";
-      return "architect";
+      if (scope === "per_file") return "searchius";
+      if (scope === "cross_file") return "rewritius";
+      return "rewritius";
     }
 
-    return "rewriter";
+    return "editius";
   }
 
   /**
@@ -3008,7 +3007,7 @@ export class SelfCorrectionCycle {
 
   /**
    * Build a structured question panel payload for the TUI escalation dialog.
-   * This follows the reverse-rpc QuestionPanelData pattern used in Step 10.
+   * This follows the reverse-rpc QuestionPanelData pattern used in the TUI escalation dialog.
    */
   toEscalationQuestionPanel(escalation: EscalationPayload): {
     id: string;

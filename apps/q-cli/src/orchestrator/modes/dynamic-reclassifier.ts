@@ -4,7 +4,7 @@
  *
  * After each turn, the orchestrator calls reclassify() to check if mode
  * escalation is warranted. This engine implements the escalation chain:
- *   AUTO → SPEED_CAMPAIGN → MEDIUM_CAMPAIGN → HIGH_CAMPAIGN → MODUS_MAXIMUS
+ *   AUTO → MODUS_MAXIMUS
  *
  * Each escalation step is triggered by characteristic signals (token growth,
  * tool failures, turn count, convergence conflicts, verification failures)
@@ -50,14 +50,8 @@ const DEFAULT_THRESHOLDS: ReclassifierThresholds = {
  * Describes the next step in the escalation chain from the current mode.
  */
 const ESCALATION_CHAIN: Record<ExecutionMode, ExecutionMode | null> = {
-  [ExecutionModes.AUTO]: ExecutionModes.SPEED_CAMPAIGN,
-  [ExecutionModes.LIGHTWEIGHT]: ExecutionModes.SPEED_CAMPAIGN,
-  [ExecutionModes.SPEED_CAMPAIGN]: ExecutionModes.MEDIUM_CAMPAIGN,
-  [ExecutionModes.MEDIUM_CAMPAIGN]: ExecutionModes.HIGH_CAMPAIGN,
-  [ExecutionModes.HIGH_CAMPAIGN]: ExecutionModes.MODUS_MAXIMUS,
+  [ExecutionModes.AUTO]: ExecutionModes.MODUS_MAXIMUS,
   [ExecutionModes.MODUS_MAXIMUS]: null, // Terminal mode — no further escalation
-  [ExecutionModes.DIRECT]: ExecutionModes.SPEED_CAMPAIGN,
-  [ExecutionModes.LIGHTWEIGHT_PLAN]: ExecutionModes.SPEED_CAMPAIGN,
 };
 
 /**
@@ -267,8 +261,8 @@ export class DynamicReclassifier {
 
   /**
    * Collect signals from the optional metadata bag. Known keys:
-   *   - convergenceConflicts (number): triggers MEDIUM→HIGH
-   *   - verificationFailures (number): triggers HIGH→MODUS_MAXIMUS
+   *   - convergenceConflicts (number): triggers escalation
+   *   - verificationFailures (number): triggers escalation
    */
   private collectMetadataSignals(metrics: ExecutionMetrics): string[] {
     const signals: string[] = [];
@@ -419,96 +413,21 @@ export class DynamicReclassifier {
     let reason = "";
 
     switch (currentMode) {
-      // ── AUTO / LIGHTWEIGHT → SPEED_CAMPAIGN ────────────────────────
-      // Trigger: tool failures > 30% (parallel dispatch can isolate)
-      case ExecutionModes.AUTO:
-      case ExecutionModes.LIGHTWEIGHT: {
+      // ── AUTO → MODUS_MAXIMUS ────────────────────────────────────────
+      // Trigger: tool failures > 30% or high turn count or rapid token growth
+      case ExecutionModes.AUTO: {
         const hasToolFailures = failureRatio > this.thresholds.toolFailureRatioThreshold;
         const hasHighTurnCount = metrics.turnCount >= 15;
-
-        if (hasToolFailures || hasHighTurnCount) {
-          shouldEscalate = true;
-          confidence = hasToolFailures ? 0.85 : 0.65;
-          reason = hasToolFailures
-            ? `Tool failure rate ${(failureRatio * 100).toFixed(0)}% exceeds threshold — parallel dispatch in SPEED_CAMPAIGN may isolate failing subtasks.`
-            : `Turn count (${metrics.turnCount}) suggests need for parallel orchestration.`;
-        }
-        break;
-      }
-
-      // ── SPEED_CAMPAIGN → MEDIUM_CAMPAIGN ──────────────────────────
-      // Trigger: rapid token growth (>threshold) AND turn count > 10
-      case ExecutionModes.SPEED_CAMPAIGN: {
         const hasRapidGrowth = signals.some((s) => s.startsWith("rapid token growth"));
-        const hasExcessiveTurns = metrics.turnCount > 10;
 
-        if (hasRapidGrowth && hasExcessiveTurns) {
+        if (hasToolFailures || hasHighTurnCount || hasRapidGrowth) {
           shouldEscalate = true;
-          confidence = 0.8;
-          reason =
-            `Rapid token growth combined with ${metrics.turnCount} turns — ` +
-            `MEDIUM_CAMPAIGN wave orchestration can better manage expanding scope.`;
-        } else if (
-          failureRatio > this.thresholds.toolFailureRatioThreshold &&
-          metrics.turnCount >= 12
-        ) {
-          // Secondary trigger: persistent failures despite parallel dispatch
-          shouldEscalate = true;
-          confidence = 0.7;
-          reason =
-            `Persistent tool failures (${(failureRatio * 100).toFixed(0)}%) after ${metrics.turnCount} turns — ` +
-            `wave orchestration may isolate problematic phases.`;
-        }
-        break;
-      }
-
-      // ── MEDIUM_CAMPAIGN → HIGH_CAMPAIGN ───────────────────────────
-      // Trigger: convergence conflicts detected in metadata
-      case ExecutionModes.MEDIUM_CAMPAIGN: {
-        const hasConflicts = signals.some((s) =>
-          s.startsWith("convergence conflicts"),
-        );
-
-        if (hasConflicts) {
-          shouldEscalate = true;
-          confidence = 0.9;
-          reason =
-            `Convergence conflicts unresolved — HIGH_CAMPAIGN convergence loops can systematically reconcile parallel outputs.`;
-        } else if (
-          failureRatio > this.thresholds.toolFailureRatioThreshold &&
-          metrics.turnCount >= 15
-        ) {
-          // Secondary: wave orchestration struggling
-          shouldEscalate = true;
-          confidence = 0.7;
-          reason =
-            `Sustained tool failures (${(failureRatio * 100).toFixed(0)}%) across waves — ` +
-            `continuous convergence may improve stability.`;
-        }
-        break;
-      }
-
-      // ── HIGH_CAMPAIGN → MODUS_MAXIMUS ─────────────────────────────
-      // Trigger: verification repeatedly fails
-      case ExecutionModes.HIGH_CAMPAIGN: {
-        const hasVerificationFailures = signals.some((s) =>
-          s.startsWith("verification failures"),
-        );
-
-        if (hasVerificationFailures) {
-          shouldEscalate = true;
-          confidence = 0.95;
-          reason =
-            `Verification repeatedly failing — MODUS_MAXIMUS full pipeline can bring comprehensive planning, ` +
-            `execution, and verification to bear.`;
-        } else if (
-          failureRatio > this.thresholds.toolFailureRatioThreshold &&
-          metrics.turnCount >= 20
-        ) {
-          shouldEscalate = true;
-          confidence = 0.75;
-          reason =
-            `Persistent issues after ${metrics.turnCount} turns — MODUS_MAXIMUS orchestration may be required.`;
+          confidence = hasToolFailures ? 0.85 : hasRapidGrowth ? 0.8 : 0.65;
+          reason = hasToolFailures
+            ? `Tool failure rate ${(failureRatio * 100).toFixed(0)}% exceeds threshold — MODUS_MAXIMUS full orchestration may provide more robust execution.`
+            : hasRapidGrowth
+              ? `Rapid token growth detected — MODUS_MAXIMUS structured planning can better manage expanding scope.`
+              : `Turn count (${metrics.turnCount}) suggests need for full orchestration pipeline.`;
         }
         break;
       }

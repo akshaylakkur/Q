@@ -68,6 +68,8 @@ export interface SlashCommandHost {
     contextTokens: number;
     maxContextTokens: number;
     executionMode: string;
+    /** Current active agent profile name (editius, rewritius, searchius, auto) */
+    activeAgent: string;
   };
 
   // Agent access
@@ -82,6 +84,8 @@ export interface SlashCommandHost {
     context: {
       messages: unknown[];
     };
+    /** Apply a named agent profile to the active agent */
+    applyProfile?(profileName: string): void;
   };
 
   // Orchestrator access (for mode switching etc.)

@@ -20,7 +20,7 @@ import type { Agent } from "../agent.js";
  * Apply a named profile to the agent.
  *
  * @param agent        The agent to configure.
- * @param profileName  Name of the profile (e.g. "rewriter", "explore", "plan").
+ * @param profileName  Name of the profile (e.g. "auto", "editius", "rewritius", "searchius").
  * @param context      Optional overrides for prompt template variables.
  * @returns            The rendered system prompt (also stored on the agent).
  * @throws             If the profile is not found.

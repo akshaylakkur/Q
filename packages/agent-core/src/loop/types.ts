@@ -1,7 +1,7 @@
 /**
  * Public contracts for the stateless agent loop.
  *
- * Defines the narrow surfaces connecting a Kosong conversation to
+ * Defines the narrow surfaces connecting an agent conversation to
  * tool execution, phase hooks, and turn results.
  */
 

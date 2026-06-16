@@ -333,7 +333,7 @@ export async function exportSession(
 
   // Determine agentProfile and executionMode from session metadata
   // (stored in the wire file's first record)
-  let agentProfile = "rewriter";
+  let agentProfile = "auto";
   let executionMode = "auto";
   let modelName = meta.model ?? "";
   if (wireContent) {

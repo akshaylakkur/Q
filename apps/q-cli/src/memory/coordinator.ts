@@ -16,7 +16,7 @@
  * Coherence enforcement detects and resolves cross-tier contradictions via LLM.
  *
  * Depends on: Steps 23–27 (all memory tiers).
- * Consumed by: Step 22 (MemorySliceBuilder), Step 29 (slash commands).
+ * Consumed by: Step 22 (MemorySliceBuilder), slash commands (TUI).
  */
 
 import { randomUUID } from "node:crypto";
@@ -37,7 +37,7 @@ import { CodebaseGraphIndex } from "./codebase_graph.js";
 import { WorkingMemory, type PrioritizedMessage } from "./working.js";
 
 // =========================================================================
-// New Types for Step 28
+// MemoryCoordinator Types
 // =========================================================================
 
 /**

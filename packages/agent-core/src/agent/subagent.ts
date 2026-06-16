@@ -257,7 +257,7 @@ export class SessionSubagentHost {
     prompt: string,
     config?: { description?: string; profileName?: string; signal?: AbortSignal },
   ): Promise<{ id: string; result?: string }> {
-    const profileName = config?.profileName ?? "general";
+    const profileName = config?.profileName ?? "auto";
     const result = await this.spawn(profileName, prompt, { signal: config?.signal });
     return { id: result.id, result: result.result };
   }

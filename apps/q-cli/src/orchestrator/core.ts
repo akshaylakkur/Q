@@ -470,7 +470,7 @@ export class OrchestratorCore {
   }
 
   // =======================================================================
-  // Internal: AUTO/DIRECT/LIGHTWEIGHT_PLAN/MODUS_MAXIMUS execution
+  // Internal: AUTO/MODUS_MAXIMUS execution
   // =======================================================================
 
   /** Resolve a MODUS_MAXIMUS confirmation from the TUI */
@@ -490,7 +490,7 @@ export class OrchestratorCore {
   ): Promise<ExecutionResult> {
     const startedAt = Date.now();
 
-    // AUTO/DIRECT/LIGHTWEIGHT_PLAN applies Invisibility Principle: no pool/convergence events emitted
+    // AUTO applies Invisibility Principle: no pool/convergence events emitted
     this.emitEvent({ type: "mode.execute", timestamp: iso(), data: { mode, scope: classification.profile.scope } });
 
     // Build a minimal task
@@ -503,8 +503,8 @@ export class OrchestratorCore {
 
     let result: ExecutionResult;
 
-    // AUTO mode: use the DIRECT handler as the natural default
-    if (mode === ExecutionModes.AUTO || mode === ExecutionModes.DIRECT) {
+    // AUTO mode: use the DirectMode handler as the natural default
+    if (mode === ExecutionModes.AUTO) {
       const { DirectMode } = await import("./modes/direct-mode.js");
       const handler = new DirectMode();
       result = await handler.execute(task, this);
@@ -518,22 +518,10 @@ export class OrchestratorCore {
       } finally {
         this._modusMaximusHandler = null;
       }
-    } else if (mode === ExecutionModes.SPEED_CAMPAIGN) {
-      const { SpeedCampaignMode } = await import("./modes/speed-campaign-mode.js");
-      const handler = new SpeedCampaignMode();
-      result = await handler.execute(task, this);
-    } else if (mode === ExecutionModes.MEDIUM_CAMPAIGN) {
-      const { MediumCampaignMode } = await import("./modes/medium-campaign-mode.js");
-      const handler = new MediumCampaignMode();
-      result = await handler.execute(task, this);
-    } else if (mode === ExecutionModes.HIGH_CAMPAIGN) {
-      const { HighCampaignMode } = await import("./modes/high-campaign-mode.js");
-      const handler = new HighCampaignMode();
-      this._modusMaximusHandler = null; // reuse the pattern
-      result = await handler.execute(task, this);
     } else {
-      const { LightweightPlanMode } = await import("./modes/lightweight-plan-mode.js");
-      const handler = new LightweightPlanMode();
+      // Fallback: direct execution
+      const { DirectMode } = await import("./modes/direct-mode.js");
+      const handler = new DirectMode();
       result = await handler.execute(task, this);
     }
 
@@ -628,7 +616,7 @@ export class OrchestratorCore {
       agentTasks.push(handle.task);
       agentResults.push({
         success: true,
-        mode: this.currentMode ?? ExecutionModes.LIGHTWEIGHT_PLAN,
+        mode: this.currentMode ?? ExecutionModes.AUTO,
         taskId: handle.id,
         output: `Changes from ${handle.profile}`,
         totalTokens: handle.tokenUsage.promptTokens + handle.tokenUsage.completionTokens,
@@ -775,11 +763,6 @@ export class OrchestratorCore {
   private modeToLevel(mode?: ExecutionMode): ExecutionModeLevel {
     switch (mode) {
       case ExecutionModes.AUTO: return 0;
-      case ExecutionModes.DIRECT: return 0;
-      case ExecutionModes.LIGHTWEIGHT_PLAN: return 1;
-      case ExecutionModes.SPEED_CAMPAIGN: return 0;
-      case ExecutionModes.MEDIUM_CAMPAIGN: return 2;
-      case ExecutionModes.HIGH_CAMPAIGN: return 4;
       case ExecutionModes.MODUS_MAXIMUS: return 4;
       default: return 0;
     }
@@ -949,7 +932,7 @@ note circular dependencies, and suggest boundary rules.`;
         id: researchTaskId,
         parentTaskId: this.activeTask?.id ?? "escalation",
         description: researchPrompt,
-        assignedAgent: "architect",
+        assignedAgent: "rewritius",
         phase: "research" as const,
         dependencies: [],
         status: "pending" as const,
@@ -1008,7 +991,7 @@ note circular dependencies, and suggest boundary rules.`;
       },
       turnCount: this.turnCount,
       userAddedContext: false,
-      currentMode: this.currentMode ?? ExecutionModes.LIGHTWEIGHT_PLAN,
+      currentMode: this.currentMode ?? ExecutionModes.AUTO,
     };
   }
 
@@ -1025,7 +1008,7 @@ note circular dependencies, and suggest boundary rules.`;
 
     return {
       success: dispatchResult.success && validationPassed,
-      mode: this.currentMode ?? ExecutionModes.LIGHTWEIGHT_PLAN,
+      mode: this.currentMode ?? ExecutionModes.AUTO,
       taskId: this.activeTask?.id ?? "unknown",
       output: `Orchestration completed in ${(durationMs / 1000).toFixed(1)}s. ${dispatchResult.waveResults.length} waves executed.${validationPassed ? " All validations passed." : " Validation failed."}`,
       error: allErrors.length > 0 ? allErrors.join("; ") : undefined,
@@ -1036,7 +1019,7 @@ note circular dependencies, and suggest boundary rules.`;
       completedAt: iso(),
       subResults: dispatchResult.waveResults.map((wr) => ({
         success: wr.success,
-        mode: this.currentMode ?? ExecutionModes.LIGHTWEIGHT_PLAN,
+        mode: this.currentMode ?? ExecutionModes.AUTO,
         taskId: `wave-${wr.waveIndex}`,
         output: `Wave ${wr.waveIndex}: ${wr.errors.length} error(s)`,
         durationMs: wr.durationMs,
@@ -1054,8 +1037,8 @@ note circular dependencies, and suggest boundary rules.`;
     const mode = this.currentMode;
 
     // Invisibility Principle:
-    // AUTO/DIRECT/LIGHTWEIGHT_PLAN: no pool or convergence events
-    if (mode === ExecutionModes.AUTO || mode === ExecutionModes.DIRECT || mode === ExecutionModes.LIGHTWEIGHT_PLAN) {
+    // AUTO: no pool or convergence events
+    if (mode === ExecutionModes.AUTO) {
       if (event.type.startsWith("convergence") || event.type.startsWith("pool")) return;
       if (event.type === "state.dispatching" || event.type === "state.converging" || event.type === "state.validating") return;
     }

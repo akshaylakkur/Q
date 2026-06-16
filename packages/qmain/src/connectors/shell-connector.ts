@@ -28,7 +28,7 @@ export interface ShellProcessHandle {
 }
 
 /**
- * ShellConnector — Process execution built on top of Kaos.
+ * ShellConnector — Process execution built on top of Qmain.
  *
  * Provides exec, execBackground, which, and pty (with optional node-pty).
  */
@@ -60,7 +60,7 @@ export class ShellConnector {
    * Returns a ShellProcessHandle with pid, kill(), wait(), and async iterables.
    *
    * Note: The async iterables and onOutput callback all resolve after the
-   * process completes, as the underlying Kaos interface doesn't provide
+   * process completes, as the underlying Qmain interface doesn't provide
    * per-chunk streaming.
    */
   execBackground(command: string, opts?: ExecOptions): ShellProcessHandle {

@@ -68,6 +68,9 @@ export class ConfigStore {
 
   /**
    * Initialize the store by resolving config from the given cwd.
+   *
+   * @param cwd - Optional working directory (defaults to process.cwd())
+   * @returns The resolved config with metadata
    */
   initialize(cwd?: string): ResolvedConfig {
     this._cwd = cwd ?? process.cwd();
@@ -79,7 +82,8 @@ export class ConfigStore {
 
   /**
    * Re-resolve the config (e.g., after a file change).
-   * Returns the list of changed dot-notation keys.
+   *
+   * @returns The re-resolved config with metadata
    */
   reload(): ResolvedConfig {
     if (!this._cwd) {
@@ -106,6 +110,9 @@ export class ConfigStore {
 
   /**
    * Get the current resolved config.
+   *
+   * @returns The current merged VConfig
+   * @throws If the store has not been initialized
    */
   get(): VConfig {
     if (!this._config) {
@@ -116,6 +123,9 @@ export class ConfigStore {
 
   /**
    * Get the resolved config with metadata.
+   *
+   * @returns The resolved config including source paths
+   * @throws If the store has not been initialized
    */
   getResolved(): ResolvedConfig {
     if (!this._resolved) {
@@ -126,6 +136,10 @@ export class ConfigStore {
 
   /**
    * Get a specific config value by dot-notation path.
+   *
+   * @param key - Dot-notation path (e.g. "orchestrator.maxParallelAgents")
+   * @returns The value at the given path, or undefined if not found
+   * @throws If the store has not been initialized
    */
   getByPath(key: string): unknown {
     if (!this._config) {

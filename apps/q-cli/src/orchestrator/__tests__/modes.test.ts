@@ -1,15 +1,15 @@
 /**
  * Tests — ExecutionMode handler framework.
  *
- * Covers the two mode handlers (DirectMode, LightweightPlanMode),
- * the DynamicReclassifier (stub), type construction, and mode dispatch.
+ * Covers the mode handlers (DirectMode, ModusMaximusMode),
+ * the DynamicReclassifier, type construction, and mode dispatch.
  */
 import { describe, it, expect } from "vitest";
 import { OrchestratorCore } from "../core.js";
 import {
   ExecutionModes,
   DirectMode,
-  LightweightPlanMode,
+  ModusMaximusMode,
   DynamicReclassifier,
   ExecutionModeHandler,
 } from "../modes/index.js";
@@ -39,20 +39,20 @@ describe("Handler interface", () => {
   it("DirectMode implements ExecutionModeHandler", () => {
     const handler = new DirectMode();
     expect(handler).toBeInstanceOf(ExecutionModeHandler);
-    expect(handler.mode).toBe(ExecutionModes.DIRECT);
+    expect(handler.mode).toBe(ExecutionModes.AUTO);
     expect(handler.description).toBeTruthy();
   });
 
-  it("LightweightPlanMode implements ExecutionModeHandler", () => {
-    const handler = new LightweightPlanMode();
+  it("ModusMaximusMode implements ExecutionModeHandler", () => {
+    const handler = new ModusMaximusMode();
     expect(handler).toBeInstanceOf(ExecutionModeHandler);
-    expect(handler.mode).toBe(ExecutionModes.LIGHTWEIGHT_PLAN);
+    expect(handler.mode).toBe(ExecutionModes.MODUS_MAXIMUS);
   });
 
   it("all handlers have unique mode values", () => {
     const modes = [
       new DirectMode().mode,
-      new LightweightPlanMode().mode,
+      new ModusMaximusMode().mode,
     ];
     expect(new Set(modes).size).toBe(2);
   });
@@ -68,14 +68,14 @@ describe("DirectMode", () => {
   it("returns a successful ExecutionResult", async () => {
     const result = await handler.execute(makeTask(), orchestrator);
     expect(result).toBeDefined();
-    expect(result.mode).toBe(ExecutionModes.DIRECT);
+    expect(result.mode).toBe(ExecutionModes.AUTO);
     expect(result.taskId).toBe("test-task-1");
     expect(result.success).toBe(true);
   });
 
   it("includes mode and taskId on failure", async () => {
     const result = await handler.execute(makeTask({ id: "" }), orchestrator);
-    expect(result.mode).toBe(ExecutionModes.DIRECT);
+    expect(result.mode).toBe(ExecutionModes.AUTO);
     expect(result.taskId).toBe("");
   });
 
@@ -91,33 +91,7 @@ describe("DirectMode", () => {
 });
 
 // =========================================================================
-// 3. LightweightPlanMode
-// =========================================================================
-
-describe("LightweightPlanMode", () => {
-  const handler = new LightweightPlanMode();
-
-  it("returns a successful result with plan steps", async () => {
-    const result = await handler.execute(makeTask(), orchestrator);
-    expect(result.success).toBe(true);
-    expect(result.mode).toBe(ExecutionModes.LIGHTWEIGHT_PLAN);
-    expect(result.subResults).toBeDefined();
-    expect(result.subResults!.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("output is present when no agent is configured", async () => {
-    const result = await handler.execute(makeTask(), orchestrator);
-    expect(result.output).toContain("⚠️");
-  });
-
-  it("changedFiles is deduplicated", async () => {
-    const result = await handler.execute(makeTask({ id: "dedup-test" }), orchestrator);
-    expect(Array.isArray(result.changedFiles)).toBe(true);
-  });
-});
-
-// =========================================================================
-// 4. DynamicReclassifier (real implementation — escalates on signals)
+// 3. DynamicReclassifier (real implementation — escalates on signals)
 // =========================================================================
 
 describe("DynamicReclassifier", () => {
@@ -160,23 +134,38 @@ describe("DynamicReclassifier", () => {
   it("reset does not throw", () => {
     expect(() => reclassifier.reset()).not.toThrow();
   });
+
+  it("escalates AUTO → MODUS_MAXIMUS with high tool failures", () => {
+    const metrics = makeMetrics({
+      toolCalls: { total: 10, failed: 5 },
+      turnCount: 15,
+      currentMode: ExecutionModes.AUTO,
+    });
+    const result = reclassifier.reclassify(metrics);
+    expect(result.shouldEscalate).toBe(true);
+    expect(result.recommendedMode).toBe(ExecutionModes.MODUS_MAXIMUS);
+  });
+
+  it("MODUS_MAXIMUS is terminal — no further escalation", () => {
+    const metrics = makeMetrics({
+      toolCalls: { total: 10, failed: 5 },
+      turnCount: 20,
+      currentMode: ExecutionModes.MODUS_MAXIMUS,
+    });
+    const result = reclassifier.reclassify(metrics);
+    expect(result.shouldEscalate).toBe(false);
+  });
 });
 
 // =========================================================================
-// 5. Types
+// 4. Types
 // =========================================================================
 
 describe("Types", () => {
   it("execution modes have expected constants", () => {
     expect(ExecutionModes.AUTO).toBe("AUTO");
-    expect(ExecutionModes.LIGHTWEIGHT).toBe("LIGHTWEIGHT");
-    expect(ExecutionModes.SPEED_CAMPAIGN).toBe("SPEED_CAMPAIGN");
-    expect(ExecutionModes.MEDIUM_CAMPAIGN).toBe("MEDIUM_CAMPAIGN");
-    expect(ExecutionModes.HIGH_CAMPAIGN).toBe("HIGH_CAMPAIGN");
     expect(ExecutionModes.MODUS_MAXIMUS).toBe("MODUS_MAXIMUS");
-    expect(ExecutionModes.DIRECT).toBe("DIRECT");
-    expect(ExecutionModes.LIGHTWEIGHT_PLAN).toBe("LIGHTWEIGHT_PLAN");
-    expect(Object.keys(ExecutionModes)).toHaveLength(8);
+    expect(Object.keys(ExecutionModes)).toHaveLength(2);
   });
 
   it("Task type constructs correctly", () => {
@@ -187,7 +176,7 @@ describe("Types", () => {
   it("ExecutionResult type includes all optional fields", () => {
     const result: ExecutionResult = {
       success: true,
-      mode: ExecutionModes.DIRECT,
+      mode: ExecutionModes.AUTO,
       taskId: "t1",
       output: "done",
       totalTokens: 100,
@@ -204,13 +193,13 @@ describe("Types", () => {
 });
 
 // =========================================================================
-// 6. All handlers produce consistent result shapes
+// 5. All handlers produce consistent result shapes
 // =========================================================================
 
 describe("All handlers", () => {
   const handlers = [
     new DirectMode(),
-    new LightweightPlanMode(),
+    new ModusMaximusMode(),
   ];
 
   for (const handler of handlers) {

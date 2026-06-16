@@ -49,7 +49,7 @@ export class ToolManager {
   private qmain: Qmain;
 
   constructor(protected readonly agent: Agent) {
-    // Capture the Kaos runtime and instantiate connectors.
+    // Capture the Qmain runtime and instantiate connectors.
     // Built-in tools are provider-agnostic, so we always initialize them
     // (the previous guard `if (agent.config.hasProvider)` was an init-order
     // hazard that prevented tools from being available in tests / early init).
@@ -520,7 +520,7 @@ function createAgentTool(agent: Agent): ExecutableTool {
       properties: {
         description: { type: "string", description: "A short (3-5 word) description of the task" },
         prompt: { type: "string", description: "The task for the sub-agent to perform" },
-        subagentType: { type: "string", description: "Optional profile name (explore, plan, coder, etc.)" },
+        subagentType: { type: "string", description: "Optional profile name (searchius, editius, rewritius, auto)" },
       },
       required: ["description", "prompt"],
     },

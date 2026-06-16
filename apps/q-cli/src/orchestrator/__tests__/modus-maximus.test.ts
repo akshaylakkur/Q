@@ -132,15 +132,9 @@ describe("ModusMaximusMode — Handler interface", () => {
     // Verify no collision with other modes
     const allModes = new Set([
       ExecutionModes.AUTO,
-      ExecutionModes.DIRECT,
-      ExecutionModes.LIGHTWEIGHT,
-      ExecutionModes.LIGHTWEIGHT_PLAN,
       ExecutionModes.MODUS_MAXIMUS,
-      ExecutionModes.SPEED_CAMPAIGN,
-      ExecutionModes.MEDIUM_CAMPAIGN,
-      ExecutionModes.HIGH_CAMPAIGN,
     ]);
-    expect(allModes.size).toBe(8);
+    expect(allModes.size).toBe(2);
   });
 });
 

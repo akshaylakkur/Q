@@ -227,7 +227,7 @@ describe("Mode dispatch", () => {
     expect(result.mode).toBe(ExecutionModes.AUTO);
   });
 
-  it("LIGHTWEIGHT_PLAN mode completes", async () => {
+  it("AUTO mode completes", async () => {
     const result = await core.submitPrompt("Update auth.ts, userService.ts, and types.ts");
     expect(result.success).toBe(true);
   });

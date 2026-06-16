@@ -179,7 +179,7 @@ export function createAgent(opts: AgentWiringOptions): Agent | null {
   agent.tools.setShellCwd(opts.workDir);
 
   try {
-    applyAgentProfile(agent, "rewriter", {
+    applyAgentProfile(agent, "auto", {
       cwd: opts.workDir,
       sessionId: "",
     });

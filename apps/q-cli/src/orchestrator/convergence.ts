@@ -415,8 +415,8 @@ export class ConvergenceEngine {
 
   private tagChange(agent: SubTask, _filePath: string): ChangeTag {
     const profile = agent.assignedAgent ?? "";
-    if (profile === "architect" || profile === "deps-resolver") return "API_CHANGE";
-    if (profile === "test-gen" || profile === "doc-gen") return "SIDE_EFFECT";
+    if (profile === "rewritius") return "API_CHANGE";
+    if (profile === "editius") return "SIDE_EFFECT";
     return "INTENDED";
   }
 

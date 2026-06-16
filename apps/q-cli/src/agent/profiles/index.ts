@@ -1,19 +1,21 @@
 /**
  * Agent profiles — YAML-based profile definitions
+ *
+ * These are the user-facing agent profiles that can be selected via /agent.
+ * Each profile has a corresponding YAML file in packages/agent-core/src/agent/profiles/
+ * that defines the system prompt template and tool set.
+ *
+ * Available profiles:
+ *   - auto:      Default general-purpose agent (all tools)
+ *   - editius:   Code editing agent (StrReplace specialist)
+ *   - rewritius: Code rewriting agent (Write specialist)
+ *   - searchius: Codebase search agent (Read/Glob/Grep specialist)
  */
 export const DEFAULT_AGENT_PROFILES = {
-  orchestrator: { name: "orchestrator", extends: undefined, tools: [] },
-  rewriter: { name: "rewriter", extends: undefined, tools: [] },
-  "test-gen": { name: "test-gen", extends: undefined, tools: [] },
-  "doc-gen": { name: "doc-gen", extends: undefined, tools: [] },
-  explore: { name: "explore", extends: undefined, tools: [] },
-  plan: { name: "plan", extends: undefined, tools: [] },
-  reviewer: { name: "reviewer", extends: undefined, tools: [] },
-  validator: { name: "validator", extends: undefined, tools: [] },
-  "deps-resolver": { name: "deps-resolver", extends: undefined, tools: [] },
-  "security-auditor": { name: "security-auditor", extends: undefined, tools: [] },
-  architect: { name: "architect", extends: undefined, tools: [] },
-  researcher: { name: "researcher", extends: undefined, tools: [] },
+  auto: { name: "auto", extends: undefined, tools: [] },
+  editius: { name: "editius", extends: undefined, tools: [] },
+  rewritius: { name: "rewritius", extends: undefined, tools: [] },
+  searchius: { name: "searchius", extends: undefined, tools: [] },
 } as const;
 
 export type AgentProfileName = keyof typeof DEFAULT_AGENT_PROFILES;

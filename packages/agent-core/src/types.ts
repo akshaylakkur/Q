@@ -1,5 +1,8 @@
 /**
- * Core types for the agent engine.
+ * @q/agent-core — Core type definitions for the agent engine.
+ *
+ * Defines the fundamental types used across the agent: token usage tracking,
+ * finish reasons, message roles, conversation messages, and execution results.
  */
 
 /** Token usage tracking */

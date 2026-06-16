@@ -101,19 +101,19 @@ const DEFAULT_WAVES: Wave[] = [
 ];
 
 const CATEGORY_PROFILE_MAP: Record<string, string> = {
-  "per-file": "rewriter",
-  "per-module": "rewriter",
-  "cross-cutting": "architect",
-  infrastructure: "deps-resolver",
+  "per-file": "editius",
+  "per-module": "rewritius",
+  "cross-cutting": "rewritius",
+  infrastructure: "rewritius",
 };
 
 const PHASE_PROFILE_MAP: Record<string, string> = {
-  research: "explore",
-  scaffold: "rewriter",
-  implement: "rewriter",
-  test: "test-gen",
-  polish: "reviewer",
-  validate: "validator",
+  research: "searchius",
+  scaffold: "rewritius",
+  implement: "rewritius",
+  test: "editius",
+  polish: "searchius",
+  validate: "searchius",
 };
 
 // =========================================================================
@@ -214,7 +214,7 @@ export class TaskDecomposer {
 
     // Research wave 0 — always present
     candidates.push(this.makeNode(id(), {
-      profile: "explore", prompt: "Explore and analyze the codebase", wave: 0, dependsOn: [],
+      profile: "searchius", prompt: "Explore and analyze the codebase", wave: 0, dependsOn: [],
       priority: 0, estimatedComplexity: 1, timeout: 60_000, verificationRequired: false, category: "per-file",
     }));
 
@@ -223,7 +223,7 @@ export class TaskDecomposer {
       const scaffoldDep = `task-${nextId - 1}`;
       for (const mod of modules) {
         candidates.push(this.makeNode(id(), {
-          profile: "rewriter", prompt: `Scaffold ${mod} module`, wave: 1,
+          profile: "rewritius", prompt: `Scaffold ${mod} module`, wave: 1,
           dependsOn: [scaffoldDep], priority: 10, estimatedComplexity: 2, timeout: 120_000,
           verificationRequired: false, category: "per-module", phase: "scaffold",
         }));
@@ -232,7 +232,7 @@ export class TaskDecomposer {
 
     // Infrastructure — wave 1
     candidates.push(this.makeNode(id(), {
-      profile: "deps-resolver", prompt: "Resolve dependencies", wave: 1, dependsOn: [],
+      profile: "rewritius", prompt: "Resolve dependencies", wave: 1, dependsOn: [],
       priority: 5, estimatedComplexity: 1, timeout: 60_000, verificationRequired: false,
       category: "infrastructure", phase: "scaffold",
     }));
@@ -242,7 +242,7 @@ export class TaskDecomposer {
     for (let i = 0; i < fileCount; i++) {
       const fn = files[i] ?? `${modules[0] ?? "main"}/file-${i + 1}`;
       candidates.push(this.makeNode(id(), {
-        profile: "rewriter", prompt: `Implement changes in ${fn}`, wave: 2, dependsOn: [],
+        profile: "rewritius", prompt: `Implement changes in ${fn}`, wave: 2, dependsOn: [],
         priority: 20, estimatedComplexity: depth === "deep" ? 3 : 1, timeout: 180_000,
         verificationRequired: depth === "deep" || depth === "campaign",
         category: "per-file", phase: "implement",
@@ -252,7 +252,7 @@ export class TaskDecomposer {
     // Cross-cutting — wave 2
     if (scope === "cross_cutting" || scope === "codebase_gen") {
       candidates.push(this.makeNode(id(), {
-        profile: "architect", prompt: "Ensure cross-cutting consistency", wave: 2,
+        profile: "rewritius", prompt: "Ensure cross-cutting consistency", wave: 2,
         dependsOn: [], priority: 15, estimatedComplexity: 3, timeout: 120_000,
         verificationRequired: true, category: "cross-cutting", phase: "implement",
       }));
@@ -262,7 +262,7 @@ export class TaskDecomposer {
     if (profile.requiresVerification || depth !== "surface") {
       for (const mod of modules) {
         candidates.push(this.makeNode(id(), {
-          profile: "test-gen", prompt: `Generate tests for ${mod}`, wave: 3, dependsOn: [],
+          profile: "editius", prompt: `Generate tests for ${mod}`, wave: 3, dependsOn: [],
           priority: 30, estimatedComplexity: 2, timeout: 120_000, verificationRequired: true,
           category: "per-module", phase: "test",
         }));
@@ -270,7 +270,7 @@ export class TaskDecomposer {
     }
     for (const mod of modules) {
       candidates.push(this.makeNode(id(), {
-        profile: "doc-gen", prompt: `Document ${mod}`, wave: 3, dependsOn: [],
+        profile: "rewritius", prompt: `Document ${mod}`, wave: 3, dependsOn: [],
         priority: 35, estimatedComplexity: 1, timeout: 60_000, verificationRequired: false,
         category: "per-module", phase: "test",
       }));
@@ -279,14 +279,14 @@ export class TaskDecomposer {
     // Wave 5 — validation
     if (profile.requiresVerification || depth !== "surface") {
       candidates.push(this.makeNode(id(), {
-        profile: "validator", prompt: "Run full validation", wave: 5, dependsOn: [],
+        profile: "searchius", prompt: "Run full validation", wave: 5, dependsOn: [],
         priority: 60, estimatedComplexity: 2, timeout: 300_000, verificationRequired: true,
         category: "cross-cutting", phase: "validate",
       }));
     }
     if (depth === "deep" || depth === "campaign") {
       candidates.push(this.makeNode(id(), {
-        profile: "security-auditor", prompt: "Security review", wave: 5, dependsOn: [],
+        profile: "searchius", prompt: "Security review", wave: 5, dependsOn: [],
         priority: 50, estimatedComplexity: 3, timeout: 120_000, verificationRequired: true,
         category: "cross-cutting", phase: "validate",
       }));
@@ -336,16 +336,16 @@ export class TaskDecomposer {
 
   private assignProfiles(nodes: TaskGraphNode[]): void {
     for (const node of nodes) {
-      // Preserve wave-0 (explore/research) and explicitly-set useful profiles
-      if (node.wave === 0) { node.profile = "explore"; continue; }
-      if (node.profile && node.profile !== "explore") continue;
+      // Preserve wave-0 (searchius/research) and explicitly-set useful profiles
+      if (node.wave === 0) { node.profile = "searchius"; continue; }
+      if (node.profile && node.profile !== "searchius") continue;
 
       if (node.phase && PHASE_PROFILE_MAP[node.phase]) {
         node.profile = PHASE_PROFILE_MAP[node.phase]!;
       } else if (node.category && CATEGORY_PROFILE_MAP[node.category]) {
         node.profile = CATEGORY_PROFILE_MAP[node.category]!;
       } else {
-        node.profile = "explore";
+        node.profile = "searchius";
       }
     }
   }
@@ -383,7 +383,7 @@ export class TaskDecomposer {
       } else {
         const reason = sr.reason instanceof Error ? sr.reason.message : String(sr.reason);
         errors.push(`Task ${st.id}: ${reason}`);
-        taskResults.set(st.id, { success: false, mode: "LIGHTWEIGHT_PLAN" as any, taskId: st.id, error: reason, completedAt: new Date().toISOString() });
+        taskResults.set(st.id, { success: false, mode: "AUTO" as any, taskId: st.id, error: reason, completedAt: new Date().toISOString() });
       }
     }
 
@@ -428,7 +428,7 @@ export class TaskDecomposer {
           this.pool.offCompletion(listener);
           resolve({
             success: handle.state === "completed",
-            mode: "LIGHTWEIGHT_PLAN" as any,
+            mode: "AUTO" as any,
             taskId: handle.id,
             output: `Task ${handle.id}: ${handle.state}`,
             totalTokens: handle.tokenUsage.promptTokens + handle.tokenUsage.completionTokens,

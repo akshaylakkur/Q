@@ -161,10 +161,6 @@ export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 
 export const DefaultExecutionModeSchema = z.enum([
   "auto",
-  "lightweight",
-  "speed_campaign",
-  "medium_campaign",
-  "high_campaign",
   "modus_maximus",
 ]);
 

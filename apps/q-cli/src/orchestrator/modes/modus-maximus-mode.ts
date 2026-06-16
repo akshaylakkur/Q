@@ -67,7 +67,7 @@ const MAX_STEPS = 50;
 /**
  * Resolve the best agent profile for a given step based on its content.
  * This heuristic inspects the step title and instructions to determine
- * whether it needs a rewriter, test-gen, architect, etc.
+ * whether it needs an editius, rewritius, searchius, etc.
  */
 function resolveProfileForStep(step: ParsedStep): string {
   const title = step.title.toLowerCase();
@@ -78,35 +78,35 @@ function resolveProfileForStep(step: ParsedStep): string {
     instructions.includes("write test") || instructions.includes("unit test") ||
     instructions.includes("integration test") || instructions.includes("e2e")
   ) {
-    return "test-gen";
+    return "editius";
   }
   if (
     title.includes("scaffold") || title.includes("config") ||
     title.includes("project") || title.includes("monorepo") ||
     title.includes("dependenc") || title.includes("package")
   ) {
-    return "architect";
+    return "rewritius";
   }
   if (
     title.includes("doc") || title.includes("readme") ||
     instructions.includes("document") || instructions.includes("readme")
   ) {
-    return "doc-gen";
+    return "rewritius";
   }
   if (
     title.includes("validat") || title.includes("verify") ||
     title.includes("review") || title.includes("audit")
   ) {
-    return "reviewer";
+    return "searchius";
   }
   if (
     title.includes("architect") || title.includes("design") ||
     title.includes("data model") || title.includes("schema")
   ) {
-    return "architect";
+    return "rewritius";
   }
-  // Default to rewriter for implementation steps
-  return "rewriter";
+  // Default to rewritius for implementation steps
+  return "rewritius";
 }
 
 // =========================================================================

@@ -9,7 +9,7 @@ import type { ExecutionResult, SubTask } from "../modes/types.js";
 function makeResult(overrides?: Partial<ExecutionResult>): ExecutionResult {
   return {
     success: true,
-    mode: "LIGHTWEIGHT_PLAN" as any,
+    mode: "AUTO" as any,
     taskId: "task-1",
     output: "Made changes to the API module",
     changedFiles: ["src/api/handler.ts", "src/api/types.ts"],
@@ -59,7 +59,7 @@ describe("Diff utilities", () => {
 describe("Types", () => {
   it("ChangeSet can be constructed", () => {
     const cs: ChangeSet = {
-      agentId: "sub-1", agentProfile: "rewriter", priority: 10,
+      agentId: "sub-1", agentProfile: "rewritius", priority: 10,
       filePath: "src/api/handler.ts",
       oldContent: "old", newContent: "new",
       diff: "@@ -1 +1 @@\n-old\n+new",

@@ -62,18 +62,18 @@ export interface RenderContext {
 function resolveProfileDir(): string {
   // 1. The directory of the source/bundled file
   const here = dirname(new URL(import.meta.url).pathname);
-  if (existsSync(join(here, "rewriter.yaml"))) {
+  if (existsSync(join(here, "auto.yaml"))) {
     return here;
   }
 
   // 2. Walk up the tree from here looking for a `profiles/` directory that
-  //    contains `rewriter.yaml` (the canonical profile). This handles
+  //    contains `auto.yaml` (the canonical profile). This handles
   //    pnpm hoisting, monorepo layouts, and the bundled dist case where
   //    the YAMLs are copied alongside `dist/`.
   let cursor = here;
   for (let i = 0; i < 6; i++) {
     const candidate = join(cursor, "profiles");
-    if (existsSync(join(candidate, "rewriter.yaml"))) {
+    if (existsSync(join(candidate, "auto.yaml"))) {
       return candidate;
     }
     const parent = dirname(cursor);
@@ -84,7 +84,7 @@ function resolveProfileDir(): string {
   // 3. Last resort: try alongside `node_modules/@q/agent-core/profiles`.
   //    This is for pnpm-style installs where the package is nested.
   const nmPath = join(here, "..", "..", "..", "profiles");
-  if (existsSync(join(nmPath, "rewriter.yaml"))) {
+  if (existsSync(join(nmPath, "auto.yaml"))) {
     return nmPath;
   }
 

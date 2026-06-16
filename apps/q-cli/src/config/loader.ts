@@ -21,6 +21,9 @@ import {
 /**
  * Parse and validate a raw TOML record into a VConfig.
  * Unknown keys are captured in the `raw` field.
+ *
+ * @param raw - The raw parsed TOML object
+ * @returns A validated VConfig
  */
 export function parseAndValidate(raw: Record<string, unknown>): VConfig {
   return parseVConfig(raw);
@@ -28,6 +31,9 @@ export function parseAndValidate(raw: Record<string, unknown>): VConfig {
 
 /**
  * Try to parse a config object, returning null on failure.
+ *
+ * @param raw - The raw parsed TOML object
+ * @returns A validated VConfig, or null if parsing fails
  */
 export function tryParseAndValidate(raw: Record<string, unknown>): VConfig | null {
   try {

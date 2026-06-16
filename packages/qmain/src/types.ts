@@ -1,3 +1,10 @@
+/**
+ * @q/qmain — Core type definitions for the execution environment abstraction.
+ *
+ * Defines the result and process handle types used across all Qmain
+ * implementations (local, SSH, Docker, etc.).
+ */
+
 /** Result from executing a command */
 export interface ExecResult {
   stdout: string;

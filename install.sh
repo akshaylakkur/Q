@@ -176,7 +176,7 @@ mkdir -p "${BUILD_DIR}/apps/q-cli/dist"
 cp -R "${PROJECT_DIR}/apps/q-cli/dist/" "${BUILD_DIR}/apps/q-cli/dist/"
 
 # Agent core YAML profiles — the profile loader walks up from
-# import.meta.url looking for a profiles/ dir with rewriter.yaml.
+# import.meta.url looking for a profiles/ dir with auto.yaml.
 # Place them alongside dist/ so the walk-up finds them at i=0.
 if [ -d "${PROJECT_DIR}/packages/agent-core/dist/profiles" ]; then
   mkdir -p "${BUILD_DIR}/apps/q-cli/dist/profiles"

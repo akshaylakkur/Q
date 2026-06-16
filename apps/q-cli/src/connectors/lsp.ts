@@ -15,8 +15,8 @@
  *   - Dynamic tool definitions for the agent
  *   - Per-request AbortSignal timeout
  *
- * Step 32 — consumed by Step 5 (tool registration), Step 20 (TypeCheckGate fast path),
- * and Step 35 (q-cli doctor).
+ * Consumed by tool registration, TypeCheckGate fast path,
+ * and q-cli doctor.
  */
 
 import { spawn, execFile, type ChildProcess } from "node:child_process";

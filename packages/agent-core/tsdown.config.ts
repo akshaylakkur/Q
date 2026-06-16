@@ -16,7 +16,7 @@ export default defineConfig({
   // Copy the bundled agent profiles (YAML files) into dist/profiles so the
   // built single-file bundle can still resolve them at runtime. The loader
   // walks up from `import.meta.url` looking for a `profiles/` directory
-  // containing `rewriter.yaml` — when run from the dist output it lands
+  // containing `auto.yaml` — when run from the dist output it lands
   // exactly here.
   copy: [
     {

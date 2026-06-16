@@ -1,5 +1,5 @@
 /**
- * Connector Layer — Higher-level abstractions built on top of Kaos.
+ * Connector Layer — Higher-level abstractions built on top of Qmain.
  *
  * ShellConnector  — Process execution, background tasks, which, PTY
  * FileConnector   — File read/write/edit/glob/grep/copy/move/delete/snapshot

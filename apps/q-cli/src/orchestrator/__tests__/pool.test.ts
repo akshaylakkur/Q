@@ -46,7 +46,7 @@ describe("Types", () => {
     const controller = new AbortController();
     const handle: SubAgentHandle = {
       id: "agent-1",
-      profile: "explore",
+      profile: "searchius",
       state: "running",
       moduleTarget: "api",
       priority: 50,
@@ -121,11 +121,11 @@ describe("Scheduling — immediate dispatch", () => {
 
   it("queues when per-profile limit is reached", () => {
     const profilePool = new SubAgentPoolManager({
-      profileLimits: { "test-gen": 1 },
+      profileLimits: { "editius": 1 },
       globalConcurrency: 8,
     });
-    profilePool.schedule(makeSubTask({ id: "t1", assignedAgent: "test-gen", phase: "test_generation" }));
-    const second = profilePool.schedule(makeSubTask({ id: "t2", assignedAgent: "test-gen", phase: "test_generation" }));
+    profilePool.schedule(makeSubTask({ id: "t1", assignedAgent: "editius", phase: "test_generation" }));
+    const second = profilePool.schedule(makeSubTask({ id: "t2", assignedAgent: "editius", phase: "test_generation" }));
     expect(second).toBeNull(); // queued (profile limit reached)
   });
 
@@ -163,7 +163,7 @@ describe("Priority Buckets", () => {
   });
 
   it("explore phase → bucket 1", () => {
-    const st = makeSubTask({ phase: "explore" });
+    const st = makeSubTask({ phase: "searchius" });
     const handle = pool.schedule(st);
     expect(handle).not.toBeNull();
   });
@@ -175,13 +175,13 @@ describe("Priority Buckets", () => {
   });
 
   it("test generation → bucket 3", () => {
-    const st = makeSubTask({ assignedAgent: "test-gen", phase: "test_generation", description: "test" });
+    const st = makeSubTask({ assignedAgent: "editius", phase: "test_generation", description: "test" });
     const handle = pool.schedule(st);
     expect(handle).not.toBeNull();
   });
 
   it("documentation → bucket 3", () => {
-    const st = makeSubTask({ assignedAgent: "doc-gen", phase: "documentation", description: "docs" });
+    const st = makeSubTask({ assignedAgent: "rewritius", phase: "documentation", description: "docs" });
     const handle = pool.schedule(st);
     expect(handle).not.toBeNull();
   });
@@ -205,7 +205,7 @@ describe("Dependency ordering", () => {
   });
 
   it("task with unmet dependencies is queued", () => {
-    const depSt = makeSubTask({ id: "dep-target", description: "setup", phase: "explore" });
+    const depSt = makeSubTask({ id: "dep-target", description: "setup", phase: "searchius" });
     const st = makeSubTask({ id: "dependent", description: "real work", phase: "implementation", dependencies: ["dep-target"] });
 
     // Schedule the dependent first — dependencies not met
@@ -224,7 +224,7 @@ describe("Dependency ordering", () => {
 
   it("dependenciesMet returns false when deps not completed", () => {
     // First, schedule and start the dependency
-    const dep = makeSubTask({ id: "dep-x", description: "dep", phase: "explore" });
+    const dep = makeSubTask({ id: "dep-x", description: "dep", phase: "searchius" });
     pool.schedule(dep);
     // Dep is running, not completed yet
     const st = makeSubTask({ id: "dependent-x", dependencies: ["dep-x"] });

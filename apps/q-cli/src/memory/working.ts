@@ -3,9 +3,9 @@
  *
  * Step 23: Enhanced ContextMemory.
  *
- * Replaces the Step 5 stub with a full working memory implementation that
- * supports priority-retention tagging, automatic fact extraction during
- * compaction, and a three-tier graduated compaction protocol.
+ * Full working memory implementation that supports priority-retention
+ * tagging, automatic fact extraction during compaction, and a three-tier
+ * graduated compaction protocol.
  *
  * Configuration (via config.memory):
  *   compactionTriggerRatio: number (default 0.75)

@@ -47,6 +47,12 @@ export interface ChatProvider {
 export class ProviderFactory {
   /**
    * Create a provider adapter from configuration.
+   *
+   * @param type - Provider type (e.g. "anthropic", "openai", "ollama")
+   * @param modelName - The model name to use
+   * @param config - Provider configuration including API keys and endpoints
+   * @returns A ChatProvider instance for the given provider type
+   * @throws If the provider type is not supported
    */
   static create(
     type: string,

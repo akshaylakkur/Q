@@ -2,8 +2,9 @@
  * SubAgentPoolManager — Manages lifecycle, scheduling, and health
  * monitoring of all sub-agents.
  *
- * Step 22 integration: builds and applies MemorySlice before spawning
- * each sub-agent, scoping its context to the assigned module.
+ * Integrates with MemorySliceBuilder to build and apply scoped memory
+ * slices before spawning each sub-agent, limiting its context to the
+ * assigned module.
  */
 
 import { MinPriorityQueue } from "@datastructures-js/priority-queue";
@@ -65,7 +66,7 @@ export interface PoolConfig {
 
 const DEFAULT_POOL_CONFIG: PoolConfig = {
   globalConcurrency: 8,
-  profileLimits: { rewrites: 3, "test-gen": 2, "doc-gen": 2, explore: 4, researcher: 3, validator: 2, architect: 1, "deps-resolver": 1 },
+  profileLimits: { rewritius: 3, searchius: 4, auto: 6 },
   moduleConcurrency: 2,
   heartbeatInterval: 5,
   heartbeatTimeoutMs: 60_000,
@@ -89,7 +90,7 @@ export class SubAgentPoolManager {
   private rootAgent?: Agent;
   private subagentHost?: SessionSubagentHost;
 
-  // Step 22: Memory slicing dependencies
+  // Memory slicing dependencies
   private topology?: WorkspaceTopology;
   private memoryCoordinator?: MemoryCoordinator;
   private memorySliceBuilder = new MemorySliceBuilder();
@@ -156,7 +157,7 @@ export class SubAgentPoolManager {
     const priority = this.computePriority(subTask, bucket);
     const handle: SubAgentHandle = {
       id: subTask.id,
-      profile: subTask.assignedAgent ?? "explore",
+      profile: subTask.assignedAgent ?? "searchius",
       state: "created",
       moduleTarget,
       priority,
@@ -213,7 +214,7 @@ export class SubAgentPoolManager {
   private _codebaseGraphIndex: unknown = null;
 
   // -----------------------------------------------------------------------
-  // Step 22: Memory Slice Integration
+  // Memory Slice Integration
   // -----------------------------------------------------------------------
 
   /**
@@ -240,7 +241,7 @@ export class SubAgentPoolManager {
     // Convert SubTask to a minimal TaskGraphNode for MemorySliceBuilder
     const taskNode = {
       id: task.id,
-      profile: task.assignedAgent ?? "explore",
+      profile: task.assignedAgent ?? "searchius",
       prompt: task.description || "",
       dependsOn: task.dependencies ?? [],
       priority: 50,
@@ -313,10 +314,10 @@ export class SubAgentPoolManager {
     }
 
     // Real sub-agent spawning via SessionSubagentHost
-    const profileName = task.assignedAgent ?? "explore";
+    const profileName = task.assignedAgent ?? "searchius";
     let prompt = task.description || task.phase || "Execute the assigned task";
 
-    // Build and apply memory slice before spawning (Step 22 integration)
+    // Build and apply memory slice before spawning
     const memorySlice = this.buildMemorySlice(profileName, task);
     if (memorySlice) {
       // Include all slice data (working memory + decisions + constraints)
@@ -363,9 +364,9 @@ export class SubAgentPoolManager {
   private classifyBucket(subTask: SubTask): PriorityBucket {
     const phase = subTask.phase;
     const profile = subTask.assignedAgent ?? "";
-    if (phase === "dependency_resolution" || profile === "deps-resolver") return 0;
-    if (phase === "scaffolding" || phase === "research" || phase === "explore" || profile === "explore" || profile === "researcher") return 1;
-    if (phase === "test_generation" || phase === "documentation" || profile === "test-gen" || profile === "doc-gen") return 3;
+    if (phase === "dependency_resolution" || profile === "rewritius") return 0;
+    if (phase === "scaffolding" || phase === "research" || phase === "explore" || profile === "searchius") return 1;
+    if (phase === "test_generation" || phase === "documentation" || profile === "editius") return 3;
     return 2;
   }
 

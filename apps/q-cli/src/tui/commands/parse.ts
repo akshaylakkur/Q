@@ -1,12 +1,17 @@
 /**
  * Parse — Parse "/command args" from user input.
+ *
+ * Takes raw user input, extracts the command name and arguments,
+ * and validates basic structure (no nested slashes).
  */
 
 import type { ParsedSlashInput } from "./types.js";
 
 /**
  * Parse a text input that starts with "/".
- * Returns null if it's not a valid slash command.
+ *
+ * @param input - Raw user input string starting with "/"
+ * @returns ParsedSlashInput with name and args, or null if not a valid slash command
  */
 export function parseSlashInput(input: string): ParsedSlashInput | null {
   if (!input.startsWith("/")) return null;

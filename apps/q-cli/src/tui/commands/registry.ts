@@ -2,7 +2,10 @@
  * Registry — Central registry of all built-in slash commands.
  *
  * This defines the complete set of 40+ commands across 7 categories.
- * Category 1 (Core) is implemented; others are stubs for future implementation.
+ * Category 1 (Core) is fully implemented. Categories 2-7 have command
+ * definitions and autocomplete but their handlers show "not yet implemented"
+ * status messages. As each command is implemented, its handler in index.ts
+ * should be updated to call the real implementation.
  */
 
 import type { QSlashCommand, CommandCategory } from "./types.js";
@@ -13,12 +16,19 @@ import type { AutocompleteItem } from "@earendil-works/pi-tui";
 // =========================================================================
 
 export const MODE_ARGUMENT_COMPLETIONS: AutocompleteItem[] = [
-  { value: "auto", label: "auto", description: "Default natural system behavior (classifier-driven)" },
-  { value: "lightweight", label: "lightweight", description: "Lightweight plan execution" },
-  { value: "speed-campaign", label: "speed-campaign", description: "Fast parallel dispatch — decompose and run independent tasks simultaneously" },
-  { value: "medium-campaign", label: "medium-campaign", description: "Orchestrated multi-wave campaign with convergence & quality gates" },
-  { value: "high-campaign", label: "high-campaign", description: "Continuous convergence campaign with full verification & checkpointing" },
-  { value: "modus-maximus", label: "modus-maximus", description: "Full orchestration pipeline" },
+  { value: "auto", label: "auto", description: "Default mode — single-agent turn loop with classifier-driven behavior adaptation" },
+  { value: "modus-maximus", label: "modus-maximus", description: "Multi-agent orchestration pipeline — plan, confirm, execute, summarize" },
+];
+
+// =========================================================================
+// Agent profile argument completions (shared with agent.ts handler)
+// =========================================================================
+
+export const AGENT_ARGUMENT_COMPLETIONS: AutocompleteItem[] = [
+  { value: "editius", label: "editius", description: "Precise editing profile — StrReplace, Read, and targeted modifications with minimal diff footprint" },
+  { value: "rewritius", label: "rewritius", description: "Refactoring profile — full file rewrites, module transformations, and large-scale changes" },
+  { value: "searchius", label: "searchius", description: "Analysis profile — systematic codebase search, pattern detection, and intelligence gathering" },
+  { value: "auto", label: "auto", description: "Adaptive profile — automatically selects the best methodology for each task" },
 ];
 
 // =========================================================================
@@ -85,7 +95,7 @@ export const ALL_SLASH_COMMANDS = [
   {
     name: "mode",
     aliases: ["execution"],
-    description: "Switch orchestrator execution mode: auto, lightweight, speed-campaign, medium-campaign, high-campaign, modus-maximus",
+    description: "Switch orchestrator execution mode: auto, modus-maximus",
     category: "agent" as CommandCategory,
     priority: 90,
     usage: "/mode <name>",
@@ -94,18 +104,19 @@ export const ALL_SLASH_COMMANDS = [
   {
     name: "plan",
     aliases: ["blueprint"],
-    description: "Toggle plan mode on/off, clear plan, or show plan tree",
+    description: "Toggle plan mode on/off",
     category: "agent" as CommandCategory,
     priority: 88,
-    usage: "/plan [on|off|clear|show]",
+    usage: "/plan [on|off]",
   },
   {
     name: "agent",
     aliases: ["profile", "persona"],
-    description: "Switch agent profile (orchestrator, rewriter, test-gen, etc.)",
+    description: "Switch agent profile: editius, rewritius, searchius, auto",
     category: "agent" as CommandCategory,
     priority: 85,
     usage: "/agent <profile-name>",
+    getArgumentCompletions: (_argumentPrefix: string) => AGENT_ARGUMENT_COMPLETIONS,
   },
   {
     name: "rewind",

@@ -109,7 +109,7 @@ describe("MemorySliceBuilder — build()", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-1",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Implement changes in core module",
       dependsOn: [],
       priority: 20,
@@ -121,7 +121,7 @@ describe("MemorySliceBuilder — build()", () => {
       category: "per-module",
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
 
     expect(slice).toBeDefined();
     expect(slice.workingMemory).toContain("TASK");
@@ -134,7 +134,7 @@ describe("MemorySliceBuilder — build()", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-ui",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Update ui component button",
       dependsOn: [],
       priority: 20,
@@ -146,7 +146,7 @@ describe("MemorySliceBuilder — build()", () => {
       category: "per-module",
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
     // The builder extracts "ui" from the prompt since "ui" is a known module
     expect(slice.codebaseGraph.moduleFiles.length).toBeGreaterThanOrEqual(1);
     // Verify we got the ui module
@@ -160,7 +160,7 @@ describe("MemorySliceBuilder — build()", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-ui",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Fix ui module",
       dependsOn: [],
       priority: 20,
@@ -171,7 +171,7 @@ describe("MemorySliceBuilder — build()", () => {
       outputSpec: {},
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
     expect(slice.workingMemory).toContain("TARGET MODULE");
     expect(slice.workingMemory).toContain("MODULE FILES");
   });
@@ -205,7 +205,7 @@ describe("Memory filtering", () => {
       sequenceNumber: 1,
       timestamp: { start: now - 1000, end: now },
       trigger: "compaction",
-      agentProfile: "rewriter",
+      agentProfile: "rewritius",
       moduleScope: ["core"],
       summary: "Refactored core module exports",
       affectedFiles: [join(testDir, "src/core/index.ts")],
@@ -221,7 +221,7 @@ describe("Memory filtering", () => {
       sequenceNumber: 2,
       timestamp: { start: now, end: now + 1000 },
       trigger: "compaction",
-      agentProfile: "test-gen",
+      agentProfile: "editius",
       moduleScope: ["ui"],
       summary: "Added tests for UI button",
       affectedFiles: [join(testDir, "src/ui/button.ts")],
@@ -289,7 +289,7 @@ describe("Memory filtering", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-core",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Fix core module",
       dependsOn: [],
       priority: 20,
@@ -300,7 +300,7 @@ describe("Memory filtering", () => {
       outputSpec: {},
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
     // Only ep-1 (core) should be included
     expect(slice.episodes).toHaveLength(1);
     expect(slice.episodes[0]!.id).toBe("ep-1");
@@ -310,7 +310,7 @@ describe("Memory filtering", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-core",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Fix core module",
       dependsOn: [],
       priority: 20,
@@ -321,7 +321,7 @@ describe("Memory filtering", () => {
       outputSpec: {},
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
     // Only fact-1 (core) should be included (fact-2 is about rendering, not core)
     expect(slice.facts).toHaveLength(1);
     // Check that the fact relates to core
@@ -332,7 +332,7 @@ describe("Memory filtering", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-core",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Fix core module",
       dependsOn: [],
       priority: 20,
@@ -343,7 +343,7 @@ describe("Memory filtering", () => {
       outputSpec: {},
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
     // dec-1 applies to core (has core in affectedPaths), dec-2 does not
     expect(slice.decisions).toHaveLength(1);
     expect(slice.decisions[0]!.id).toBe("dec-1");
@@ -353,7 +353,7 @@ describe("Memory filtering", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-core",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Fix core module exports",
       dependsOn: [],
       priority: 20,
@@ -364,7 +364,7 @@ describe("Memory filtering", () => {
       outputSpec: {},
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
 
     // Working memory should be comprehensive
     expect(slice.workingMemory).toContain("TASK");
@@ -402,7 +402,7 @@ describe("Codebase subgraph", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-core",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Fix core module",
       dependsOn: [],
       priority: 20,
@@ -413,7 +413,7 @@ describe("Codebase subgraph", () => {
       outputSpec: {},
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
     const cg = slice.codebaseGraph;
 
     // Core module should have main.ts
@@ -433,7 +433,7 @@ describe("Codebase subgraph", () => {
     const builder = new MemorySliceBuilder();
     const taskNode: TaskGraphNode = {
       id: "task-utils",
-      profile: "rewriter",
+      profile: "rewritius",
       prompt: "Fix utils module",
       dependsOn: [],
       priority: 20,
@@ -444,7 +444,7 @@ describe("Codebase subgraph", () => {
       outputSpec: {},
     };
 
-    const slice = builder.build("rewriter", taskNode, topology, memoryCoordinator);
+    const slice = builder.build("rewritius", taskNode, topology, memoryCoordinator);
     const cg = slice.codebaseGraph;
 
     expect(cg).toHaveProperty("moduleRoot");
@@ -474,7 +474,7 @@ describe("applySlice", () => {
           sequenceNumber: 1,
           timestamp: { start: 1000, end: 2000 },
           trigger: "compaction",
-          agentProfile: "rewriter",
+          agentProfile: "rewritius",
           moduleScope: ["core"],
           summary: "Refactored core module",
           affectedFiles: ["/src/core/index.ts"],
@@ -564,7 +564,7 @@ describe("Pool integration", () => {
     const { SubAgentPoolManager } = await import("../pool.js");
     const pool = new SubAgentPoolManager();
 
-    const result = pool.buildMemorySlice("rewriter", {
+    const result = pool.buildMemorySlice("rewritius", {
       id: "test",
       parentTaskId: "parent",
       description: "Fix core module",
@@ -600,7 +600,7 @@ describe("MemoryCoordinator queries", () => {
       sequenceNumber: 1,
       timestamp: { start: now, end: now },
       trigger: "compaction",
-      agentProfile: "rewriter",
+      agentProfile: "rewritius",
       moduleScope: ["core"],
       summary: "Core work",
       affectedFiles: [],
@@ -616,7 +616,7 @@ describe("MemoryCoordinator queries", () => {
       sequenceNumber: 2,
       timestamp: { start: now, end: now },
       trigger: "compaction",
-      agentProfile: "rewriter",
+      agentProfile: "rewritius",
       moduleScope: ["ui"],
       summary: "UI work",
       affectedFiles: [],

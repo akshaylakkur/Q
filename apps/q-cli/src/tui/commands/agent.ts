@@ -2,22 +2,15 @@
  * Agent — Command handlers for Category 2 (Agent & Orchestration).
  *
  * This module implements:
- *  /mode   — Switch orchestrator execution mode
+ *  /mode   — Switch orchestrator execution mode (auto, modus-maximus)
+ *  /agent  — Switch active agent profile (editius, rewritius, searchius, auto)
  *
- * The 6 user-facing modes are:
- *   auto             — Default natural system behavior (classifier-driven)
- *   lightweight      — Lightweight plan execution
- *   speed-campaign   — Fast parallel dispatch
- *   medium-campaign  — Orchestrated multi-wave campaign
- *   high-campaign    — Continuous campaign with convergence
- *   modus-maximus    — Full orchestration pipeline
+ * Modes are tracked in the orchestrator and displayed in the TUI status bar.
+ * Agent profiles apply different system prompts and tool configurations to
+ * the active agent, biasing its behavior toward specific methodologies.
  *
- * Modes are tracked in the orchestrator and displayed in the TUI, but do
- * NOT yet affect the core agentic loop. Future implementations will wire
- * each mode to its specific execution strategy.
- *
- * Argument autocomplete for the 6 mode options is provided by the
- * /mode command's getArgumentCompletions hook in registry.ts.
+ * Argument autocomplete for both commands is provided by the
+ * getArgumentCompletions hooks in registry.ts.
  */
 
 import type { SlashCommandHost } from "./types.js";
@@ -25,14 +18,10 @@ import type { SlashCommandHost } from "./types.js";
 // ── User-facing mode names → display labels ─────────────────────────
 
 /**
- * The 6 available modes the user can select via /mode.
+ * The 2 available modes the user can select via /mode.
  */
 export const MODE_OPTIONS = [
   "auto",
-  "lightweight",
-  "speed-campaign",
-  "medium-campaign",
-  "high-campaign",
   "modus-maximus",
 ] as const;
 
@@ -43,10 +32,6 @@ export type ModeOption = (typeof MODE_OPTIONS)[number];
  */
 export const MODE_DISPLAY_LABELS: Record<ModeOption, string> = {
   "auto": "Auto",
-  "lightweight": "Lightweight Plan",
-  "speed-campaign": "Speed Campaign",
-  "medium-campaign": "Medium Campaign",
-  "high-campaign": "High Campaign",
   "modus-maximus": "Modus Maximus",
 };
 
@@ -56,10 +41,6 @@ export const MODE_DISPLAY_LABELS: Record<ModeOption, string> = {
  */
 export const MODE_INTERNAL_MAP: Record<ModeOption, string> = {
   "auto": "AUTO",
-  "lightweight": "LIGHTWEIGHT",
-  "speed-campaign": "SPEED_CAMPAIGN",
-  "medium-campaign": "MEDIUM_CAMPAIGN",
-  "high-campaign": "HIGH_CAMPAIGN",
   "modus-maximus": "MODUS_MAXIMUS",
 };
 
@@ -69,17 +50,82 @@ export const MODE_INTERNAL_MAP: Record<ModeOption, string> = {
  */
 export const MODE_DESCRIPTIONS: Record<ModeOption, string> = {
   "auto":
-    "Default autonomous mode — classifier-driven behavior adapts to the task at hand",
-  "lightweight":
-    "Lightweight plan execution — minimal overhead for straightforward tasks",
-  "speed-campaign":
-    "Fast parallel dispatch mode — independent tasks run concurrently",
-  "medium-campaign":
-    "Orchestrated multi-wave mode — phased execution with quality gates",
-  "high-campaign":
-    "Continuous campaign mode — iterative convergence with full validation",
+    "Default mode — single-agent turn loop with classifier-driven behavior adaptation",
   "modus-maximus":
-    "Full orchestration pipeline — end-to-end planning, execution, and review",
+    "Multi-agent orchestration pipeline — plan generation, user confirmation, sequential sub-agent execution, and summary",
+};
+
+// ── Agent profiles ──────────────────────────────────────────────────
+
+/**
+ * The 4 available agent profiles the user can select via /agent.
+ *
+ * Each profile defines:
+ * - name: The command name used in /agent <name>
+ * - label: Display label shown in the UI
+ * - description: What this agent profile specializes in
+ * - coreCapability: The primary tool/capability this profile focuses on
+ *
+ * These profiles apply different system prompts and tool configurations
+ * to the active agent, biasing its behavior toward specific methodologies.
+ */
+export const AGENT_PROFILES = [
+  {
+    name: "editius",
+    label: "Editius",
+    description: "Precise editing profile — StrReplace, Read, and targeted modifications with minimal diff footprint",
+    coreCapability: "StrReplace — surgical string replacements with read-before-edit methodology",
+  },
+  {
+    name: "rewritius",
+    label: "Rewritius",
+    description: "Refactoring profile — full file rewrites, module transformations, and large-scale changes",
+    coreCapability: "Write — complete file replacements with dependency analysis",
+  },
+  {
+    name: "searchius",
+    label: "Searchius",
+    description: "Analysis profile — systematic codebase search, pattern detection, and intelligence gathering",
+    coreCapability: "Read / Glob / Grep — structured multi-phase codebase analysis",
+  },
+  {
+    name: "auto",
+    label: "Auto",
+    description: "Adaptive profile — automatically selects the best methodology for each task",
+    coreCapability: "All tools — task-adaptive execution with best-practice methodology",
+  },
+] as const;
+
+export type AgentProfileName = (typeof AGENT_PROFILES)[number]["name"];
+
+/**
+ * Mapping from agent profile name to its display label.
+ */
+export const AGENT_DISPLAY_LABELS: Record<AgentProfileName, string> = {
+  "editius": "Editius",
+  "rewritius": "Rewritius",
+  "searchius": "Searchius",
+  "auto": "Auto",
+};
+
+/**
+ * Mapping from agent profile name to its description.
+ */
+export const AGENT_DESCRIPTIONS: Record<AgentProfileName, string> = {
+  "editius": "Precise editing profile — StrReplace, Read, and targeted modifications with minimal diff footprint",
+  "rewritius": "Refactoring profile — full file rewrites, module transformations, and large-scale changes",
+  "searchius": "Analysis profile — systematic codebase search, pattern detection, and intelligence gathering",
+  "auto": "Adaptive profile — automatically selects the best methodology for each task",
+};
+
+/**
+ * Mapping from agent profile name to its core capability description.
+ */
+export const AGENT_CORE_CAPABILITIES: Record<AgentProfileName, string> = {
+  "editius": "StrReplace — surgical string replacements with read-before-edit verification",
+  "rewritius": "Write — complete file replacements with dependency analysis",
+  "searchius": "Read / Glob / Grep — structured multi-phase codebase analysis",
+  "auto": "All tools — task-adaptive execution with best-practice methodology",
 };
 
 // ── /mode ────────────────────────────────────────────────────────────
@@ -88,11 +134,10 @@ export const MODE_DESCRIPTIONS: Record<ModeOption, string> = {
  * Handle /mode — switch the orchestrator execution mode.
  *
  * Usage: /mode <name>
- * Where <name> is one of: auto, lightweight, speed-campaign, medium-campaign,
- * high-campaign, modus-maximus
+ * Where <name> is one of: auto, modus-maximus
  *
  * The autocomplete dropdown (provided via getArgumentCompletions in registry.ts)
- * guides the user to select from the 6 available modes. No argument listing
+ * guides the user to select from the 2 available modes. No argument listing
  * is needed here — autocomplete handles discovery.
  */
 export function handleModeCommand(host: SlashCommandHost, args: string): void {
@@ -147,4 +192,87 @@ export function handleModeCommand(host: SlashCommandHost, args: string): void {
   host.showStatus(`✅ Mode switched to ${displayLabel}`, "success");
   host.showStatus(`   ${description}`, "plain");
   host.showStatus(`   (internal: ${internalMode})`, "plain");
+}
+
+// ── /agent ───────────────────────────────────────────────────────────
+
+/**
+ * Handle /agent — switch the active agent profile.
+ *
+ * Usage: /agent <name>
+ * Where <name> is one of: editius, rewritius, searchius, auto
+ *
+ * The autocomplete dropdown (provided via getArgumentCompletions in registry.ts)
+ * guides the user to select from the available profiles.
+ *
+ * When an agent profile is set, the system applies that profile's configuration
+ * (system prompt, tool set) to the active agent. The profile remains active
+ * until the user switches via /agent again.
+ */
+export function handleAgentCommand(host: SlashCommandHost, args: string): void {
+  host.track("command", { command: "agent" });
+
+  const trimmed = args.trim().toLowerCase();
+  const profileNames = AGENT_PROFILES.map((p) => p.name);
+
+  // No args — show the current agent profile and available options
+  if (!trimmed) {
+    const currentAgent = host.appState.activeAgent || "auto";
+    host.showStatus(`Current agent: ${AGENT_DISPLAY_LABELS[currentAgent as AgentProfileName] || currentAgent}`, "plain");
+
+    const desc = AGENT_DESCRIPTIONS[currentAgent as AgentProfileName];
+    if (desc) {
+      host.showStatus(`  ${desc}`, "plain");
+    }
+
+    host.showStatus("", "plain");
+    host.showStatus("Available agent profiles:", "plain");
+    for (const profile of AGENT_PROFILES) {
+      host.showStatus(
+        `  ${profile.label.padEnd(12)} ${profile.description}`,
+        "plain",
+      );
+    }
+    host.showStatus("Hint: use Tab to autocomplete agent profile names.");
+    return;
+  }
+
+  // Validate the profile name
+  const matched = AGENT_PROFILES.find((p) => p.name === trimmed);
+  if (!matched) {
+    host.showError(
+      `Unknown agent profile: "${trimmed}". Available: ${profileNames.join(", ")}`,
+    );
+    return;
+  }
+
+  const displayLabel = matched.label;
+  const description = matched.description;
+  const coreCapability = matched.coreCapability;
+
+  // Apply the agent profile to the active agent
+  // This updates the system prompt and tool set on the agent
+  if (host.agent && host.agent.applyProfile) {
+    try {
+      host.agent.applyProfile(matched.name);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      host.showError(`Failed to apply profile "${matched.name}": ${msg}`);
+      return;
+    }
+  }
+
+  // Update the app state so the current agent is tracked
+  host.appState.activeAgent = matched.name;
+
+  // ── Richer agent-switch feedback ─────────────────────────────────
+
+  // 1. Show a prominent notice banner in the transcript
+  host.showNotice(`${displayLabel}`, `${description}`);
+
+  // 2. Show status feedback with the profile-specific description
+  host.showStatus(`✅ Switched to ${displayLabel}`, "success");
+  host.showStatus(`   ${description}`, "plain");
+  host.showStatus(`   Core capability: ${coreCapability}`, "plain");
+  host.showStatus(`   (profile: ${matched.name})`, "plain");
 }

@@ -22,7 +22,7 @@ To fix, set one of:
 Or create .q/config.toml with provider, model, api_key.`;
 
 export class DirectMode extends ExecutionModeHandler {
-  readonly mode: ExecutionMode = ExecutionModes.DIRECT;
+  readonly mode: ExecutionMode = ExecutionModes.AUTO;
   readonly description = "Direct execution — zero orchestration overhead, single LLM round-trip";
 
   async execute(task: Task, orchestrator: OrchestratorCore): Promise<ExecutionResult> {

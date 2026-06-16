@@ -1,3 +1,11 @@
+/**
+ * @q/qprovs — Base provider class shared by all provider adapters.
+ *
+ * Provides shared functionality: retry with exponential backoff, request
+ * caching with TTL, and model capability inference from the built-in
+ * capability catalog.
+ */
+
 import type {
   ChatParams,
   ChatResponse,

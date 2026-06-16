@@ -163,7 +163,7 @@ async function handleReplay(sessionId: string): Promise<void> {
           recordCount: 0,
           blobCount: 0,
           modelName: firstRecord.model,
-          agentProfile: "rewriter",
+          agentProfile: "auto",
           executionMode: "auto",
           cwd: "",
           files: [],

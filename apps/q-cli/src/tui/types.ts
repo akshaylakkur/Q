@@ -25,22 +25,8 @@ export interface TuiAppState {
   executionMode: string;
   /** Whether we are in modus-maximus confirmation phase */
   modusMaximusPhase: "idle" | "planning" | "confirming" | "executing" | "summarizing";
-  /** Campaign mode: percentage of campaign completion (0-100) */
-  campaignProgress?: number;
-  /** Campaign mode: current phase name */
-  campaignPhase?: string;
-  /** Campaign mode: total sub-tasks in the campaign */
-  campaignSubTaskCount?: number;
-  /** Campaign mode: completed sub-tasks */
-  campaignCompletedCount?: number;
-  /** Campaign mode: convergence cycles completed */
-  campaignConvergenceCount?: number;
-  /** Campaign mode: gate status for medium-campaign (e.g. "pass", "fail", "pending") */
-  campaignGateStatus?: string;
-  /** Campaign mode: total files changed in high-campaign */
-  campaignFilesChanged?: number;
-  /** Campaign mode: verification status for high-campaign (e.g. "passing", "failing", "running") */
-  campaignVerificationStatus?: string;
+  /** Current active agent profile name (editius, rewritius, searchius, auto) */
+  activeAgent: string;
 }
 
 // ── Transcript Entries ─────────────────────────────────────────────────

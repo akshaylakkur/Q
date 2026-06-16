@@ -20,6 +20,7 @@ import {
 } from "./core.js";
 import {
   handleModeCommand,
+  handleAgentCommand,
 } from "./agent.js";
 
 // =========================================================================
@@ -123,13 +124,15 @@ async function handleBuiltInSlashCommand(
     case "mode":
       handleModeCommand(host, args);
       return;
-    case "plan":
     case "agent":
+      handleAgentCommand(host, args);
+      return;
+    case "plan":
     case "rewind":
     case "retry":
     case "steer":
     case "task":
-      host.showStatus(`/${name} — not yet implemented (coming soon)`);
+      host.showStatus(`/${name} — planned for future release`);
       return;
 
     // Category 3: Memory
@@ -139,7 +142,7 @@ async function handleBuiltInSlashCommand(
     case "graph":
     case "context":
     case "forget":
-      host.showStatus(`/${name} — not yet implemented (coming soon)`);
+      host.showStatus(`/${name} — planned for future release`);
       return;
 
     // Category 4: Model
@@ -148,7 +151,7 @@ async function handleBuiltInSlashCommand(
     case "thinking":
     case "key":
     case "connect":
-      host.showStatus(`/${name} — not yet implemented (coming soon)`);
+      host.showStatus(`/${name} — planned for future release`);
       return;
 
     // Category 5: Files
@@ -157,7 +160,7 @@ async function handleBuiltInSlashCommand(
     case "diff":
     case "grep":
     case "save":
-      host.showStatus(`/${name} — not yet implemented (coming soon)`);
+      host.showStatus(`/${name} — planned for future release`);
       return;
 
     // Category 6: Replay
@@ -165,7 +168,7 @@ async function handleBuiltInSlashCommand(
     case "sessions":
     case "export":
     case "undo":
-      host.showStatus(`/${name} — not yet implemented (coming soon)`);
+      host.showStatus(`/${name} — planned for future release`);
       return;
 
     // Category 7: System
@@ -176,7 +179,7 @@ async function handleBuiltInSlashCommand(
     case "skill":
     case "doctor":
     case "onboard":
-      host.showStatus(`/${name} — not yet implemented (coming soon)`);
+      host.showStatus(`/${name} — planned for future release`);
       return;
 
     default:
