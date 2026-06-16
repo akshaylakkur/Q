@@ -1,28 +1,22 @@
 {
   "name": "qode-agent",
-  "version": "0.1.0",
-  "description": "Qode — Autonomous Coding Agent. Zero-dependency binary for macOS and Windows.",
+  "version": "0.1.1",
+  "description": "Qode — Autonomous Coding Agent. Full-stack AI coding agent for your terminal.",
   "bin": {
-    "q-cli": "./bin/qode",
-    "q": "./bin/qode"
+    "q-cli": "./bin/q-cli",
+    "q": "./bin/q"
   },
   "publishConfig": {
     "access": "public"
   },
-  "optionalDependencies": {
-    "@qode-agent/darwin-arm64": "0.1.0",
-    "@qode-agent/darwin-x64": "0.1.0",
-    "@qode-agent/win32-x64": "0.1.0"
-  },
-  "scripts": {
-    "postinstall": "node ./scripts/install.js"
+  "dependencies": {
+    "@qode-agent/cli": "0.1.0"
   },
   "files": [
-    "bin/",
-    "scripts/"
+    "bin/"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.19.0"
   },
   "license": "MIT",
   "repository": {
@@ -34,6 +28,7 @@
     "ai",
     "coding-agent",
     "cli",
-    "developer-tools"
+    "developer-tools",
+    "autonomous"
   ]
 }

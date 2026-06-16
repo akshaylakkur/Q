@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  q-cli — Qode Autonomous Coding Agent
+#
+#  This wrapper resolves the @qode-agent/cli binary from the dependency
+#  tree and executes it. It handles both global and local installations.
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PKG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Try to find the @qode-agent/cli main.mjs in various locations
+MAIN_BINARY=""
+
+# 1. Check if @qode-agent/cli is installed alongside us (global install)
+if [ -f "$PKG_DIR/node_modules/@qode-agent/cli/dist/main.mjs" ]; then
+  MAIN_BINARY="$PKG_DIR/node_modules/@qode-agent/cli/dist/main.mjs"
+fi
+
+# 2. Check in the global node_modules prefix
+if [ -z "$MAIN_BINARY" ]; then
+  GLOBAL_PREFIX=$(npm root -g 2>/dev/null || echo "")
+  if [ -n "$GLOBAL_PREFIX" ] && [ -f "$GLOBAL_PREFIX/@qode-agent/cli/dist/main.mjs" ]; then
+    MAIN_BINARY="$GLOBAL_PREFIX/@qode-agent/cli/dist/main.mjs"
+  fi
+fi
+
+# 3. Check in the parent directory (pnpm global install layout)
+if [ -z "$MAIN_BINARY" ]; then
+  if [ -f "$PKG_DIR/../@qode-agent/cli/dist/main.mjs" ]; then
+    MAIN_BINARY="$PKG_DIR/../@qode-agent/cli/dist/main.mjs"
+  fi
+fi
+
+# 4. Fallback: try to resolve via node_modules lookup
+if [ -z "$MAIN_BINARY" ]; then
+  MAIN_BINARY=$(node -e "
+    try {
+      const path = require.resolve('@qode-agent/cli/dist/main.mjs', { paths: ['$PKG_DIR'] });
+      console.log(path);
+    } catch {
+      try {
+        const path = require.resolve('@qode-agent/cli/dist/main.mjs');
+        console.log(path);
+      } catch {
+        process.exit(1);
+      }
+    }
+  " 2>/dev/null || echo "")
+fi
+
+if [ -z "$MAIN_BINARY" ] || [ ! -f "$MAIN_BINARY" ]; then
+  echo "[qode-agent] Error: Could not find @qode-agent/cli binary." >&2
+  echo "[qode-agent] Try reinstalling: npm install -g qode-agent" >&2
+  exit 1
+fi
+
+exec node "$MAIN_BINARY" "$@"
