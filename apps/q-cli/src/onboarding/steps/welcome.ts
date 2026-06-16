@@ -5,26 +5,12 @@
 import chalk from "chalk";
 import type { OnboardingState, StepResult, StepValidation, WizardStep } from "../types.js";
 
-const Q_LOGO = `
-  ${chalk.hex("#6366f1").bold("QQQQQQQQ")}   ${chalk.hex("#6366f1").bold("QQ")}
-  ${chalk.hex("#6366f1").bold("QQ")}        ${chalk.hex("#6366f1").bold("QQ")}
-  ${chalk.hex("#6366f1").bold("QQ")}        ${chalk.hex("#6366f1").bold("QQ")}
-  ${chalk.hex("#6366f1").bold("QQ")}   QQQQ ${chalk.hex("#6366f1").bold("QQ")}
-  ${chalk.hex("#6366f1").bold("QQ")}      QQ ${chalk.hex("#6366f1").bold("QQ")}
-  ${chalk.hex("#6366f1").bold("QQ")}      QQ ${chalk.hex("#6366f1").bold("QQ")}
-  ${chalk.hex("#6366f1").bold("QQQQQQQQ")}   ${chalk.hex("#6366f1").bold("QQ")}
-`;
-
-const TOTAL_STEPS = 4;
-
 export class WelcomeStep implements WizardStep {
   id = "welcome";
   title = "Welcome";
 
   render(_state: OnboardingState): string {
     const lines: string[] = [];
-    lines.push("");
-    lines.push(Q_LOGO);
     lines.push("");
     lines.push(chalk.bold.hex("#6366f1")("  Welcome to Q — the autonomous coding agent."));
     lines.push("");

@@ -56,37 +56,37 @@ export const PROVIDERS: ProviderEntry[] = [
     type: "anthropic",
     name: "Anthropic",
     description: "Claude models — best-in-class for coding with extended thinking.",
-    badges: "🧠📡",
+    badges: "",
   },
   {
     type: "openai",
     name: "OpenAI",
     description: "GPT-4o, o-series — versatile with structured outputs.",
-    badges: "🧠📡",
+    badges: "",
   },
   {
     type: "google",
     name: "Google Gemini",
     description: "Gemini 2.5 Pro/Flash — multi-modal with native thinking.",
-    badges: "🧠📡",
+    badges: "",
   },
   {
     type: "ollama",
     name: "Ollama (Local)",
     description: "Local models via Ollama. Requires Ollama on localhost:11434.",
-    badges: "📡",
+    badges: "",
   },
   {
     type: "ollama-cloud",
     name: "Ollama Cloud",
     description: "Cloud-hosted Ollama models via API key. Uses api.ollama.com.",
-    badges: "🧠📡",
+    badges: "",
   },
   {
     type: "openai-compatible",
     name: "OpenAI-Compatible",
     description: "Groq, Together, Fireworks, or any OpenAI-compatible endpoint.",
-    badges: "📡",
+    badges: "",
   },
 ];
 
