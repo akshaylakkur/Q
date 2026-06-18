@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@qode-agent/agent-core": "0.2.11",
-    "@qode-agent/qollab": "workspace:*",
+    "@qode-agent/qollab": "0.3.0",
     "@qode-agent/qprovs": "0.2.11",
     "@qode-agent/qmain": "0.2.11",
     "@qode-agent/telemetry": "0.2.11",
