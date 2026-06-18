@@ -89,11 +89,15 @@ export class RemoteSession {
 
   /**
    * Send a control command to the remote daemon by appending to control.jsonl.
+   *
+   * Uses base64 encoding to avoid shell escaping issues with special characters
+   * in prompt text (quotes, backticks, dollar signs, newlines, etc.).
    */
   async sendControl(cmd: ControlCommand): Promise<void> {
-    const json = JSON.stringify(cmd).replace(/'/g, "'\\''");
-    const escaped = json.replace(/'/g, "'\\''");
-    const cmd2 = `echo '${escaped}' >> '${this.controlFilePath.replace(/'/g, "'\\''")}'`;
+    const json = JSON.stringify(cmd);
+    const b64 = Buffer.from(json, "utf-8").toString("base64");
+    const controlPath = this.controlFilePath.replace(/'/g, "'\\''");
+    const cmd2 = `echo '${b64}' | base64 -d >> '${controlPath}'`;
     const result = await this.transport.exec(cmd2);
     if (!result.ok) {
       throw new Error(`Failed to send control command: ${result.stderr}`);

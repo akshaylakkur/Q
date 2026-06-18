@@ -93,7 +93,6 @@ function createProgram(): Command {
     .version("0.1.0");
 
   prog
-    .option("-S, --session <id>", "Resume a specific session")
     .option("-C, --continue", "Continue the last session")
     .option("-y, --yolo", "Auto-approve all actions")
     .option("-m, --model <name>", "Override the LLM model")
