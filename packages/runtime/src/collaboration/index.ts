@@ -1,7 +1,7 @@
 /**
  * Collaboration — Shared sessions
  *
- * Multi-user shared TUI, real-time SSE sync,
+ * Multi-user shared TUI, real-time collaboration,
  * input queue, user management.
  */
 

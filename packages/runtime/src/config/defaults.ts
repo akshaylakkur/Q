@@ -55,4 +55,17 @@ extraSkillDirs = []
 [services]
 
 hooks = []
+
+# ── Qollab Collaboration ──────────────────────────────────────────────────
+[collaboration]
+enabled = false
+serverUrl = "wss://collab.qode.sh"
+defaultCollabType = "pair"
+maxAttendees = 8
+snapshotSyncRateLimit = 1
+encryption = "AES-256-GCM"
+
+[collaboration.chat]
+historyLimit = 10000
+colorPalette = ["#22D3EE", "#A78BFA", "#FBBF24", "#4ADE80", "#FB7185", "#38BDF8"]
 `;

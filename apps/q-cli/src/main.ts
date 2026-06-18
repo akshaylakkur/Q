@@ -17,6 +17,7 @@ import { registerSshCommand } from "./cli/ssh.js";
 import { handleQmdInteractive } from "./tui/commands/qmd.js";
 import { registerProfileCommand } from "./cli/profile.js";
 import { registerPluginCommand } from "./cli/plugin.js";
+import { registerCollabCommand } from "./cli/collab.js";
 import { getCliVersion } from "./version.js";
 import { OrchestratorCore, PluginManager, SkillRegistry, McpConnectionManager, createAgent, resolveProviderConfig } from "@qode-agent/runtime";
 import { checkFirstRun, OnboardingWizard, clearOnboardingComplete } from "./onboarding/index.js";
@@ -126,6 +127,7 @@ function registerAllCommands(prog: Command): void {
   registerSshCommand(prog);
   registerProfileCommand(prog);
   registerPluginCommand(prog);
+  registerCollabCommand(prog);
 }
 
 function parseAndValidateOptions(rawOpts: Record<string, unknown>): CliOptions {
