@@ -1,0 +1,30 @@
+{
+  "name": "@qode-agent/protocol",
+  "version": "0.1.0",
+  "description": "Qode — Shared local-to-remote wire protocol types",
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

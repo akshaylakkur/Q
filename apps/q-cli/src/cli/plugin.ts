@@ -6,8 +6,7 @@
 
 import chalk from "chalk";
 import type { Command } from "commander";
-import { PluginManager } from "../plugins/plugin-manager.js";
-import type { PluginStatus } from "../plugins/types.js";
+import { PluginManager, type PluginStatus } from "@qode-agent/runtime";
 
 /**
  * Register the `q-cli plugin` subcommand with Commander.
@@ -130,13 +129,13 @@ async function createPluginManagerForCli(): Promise<PluginManager> {
   return new PluginManager(stubSkillRegistry, stubMcpManager, stubToolManager);
 }
 
-async function createStubSkillRegistry(): Promise<import("../skills/registry.js").SkillRegistry> {
-  const { SkillRegistry } = await import("../skills/registry.js");
+async function createStubSkillRegistry(): Promise<import("@qode-agent/runtime").SkillRegistry> {
+  const { SkillRegistry } = await import("@qode-agent/runtime");
   return new SkillRegistry();
 }
 
-async function createStubMcpManager(): Promise<import("../mcp/manager.js").McpConnectionManager> {
-  const { McpConnectionManager } = await import("../mcp/manager.js");
+async function createStubMcpManager(): Promise<import("@qode-agent/runtime").McpConnectionManager> {
+  const { McpConnectionManager } = await import("@qode-agent/runtime");
   return new McpConnectionManager();
 }
 

@@ -2,11 +2,18 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import chalk from "chalk";
 
-import { exportSession, importSession, replaySession, buildReplayNotice } from "../records/export-import.js";
-import type { ExportManifest } from "../records/export-import.js";
-import { getSessionsBase, SessionStore } from "../records/session-store.js";
-import { readFirstRecord } from "../records/wire.js";
-import { createAgent, resolveProviderConfig } from "../agent/wiring.js";
+import {
+  exportSession,
+  importSession,
+  replaySession,
+  buildReplayNotice,
+  getSessionsBase,
+  SessionStore,
+  readFirstRecord,
+  createAgent,
+  resolveProviderConfig,
+  type ExportManifest,
+} from "@qode-agent/runtime";
 
 /**
  * Session management — handles list, show, delete, export, import, replay.

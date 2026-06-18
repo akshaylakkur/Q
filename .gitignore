@@ -5,7 +5,11 @@ node_modules/
 # Build output
 dist/
 dist-native/
+dist-packs/
 *.tsbuildinfo
+
+# Q-Remote build artifacts
+dist-packs/
 
 # Environment
 .env

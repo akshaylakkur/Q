@@ -150,6 +150,95 @@ Loaded in ascending priority: built-in defaults → `~/.Q/config.toml` → `.q/c
 
 ---
 
+## Remote Execution (QSSH)
+
+QSSH lets you shift heavy, long-running workflows (like Modus Maximus) from your local machine to a remote EC2 or custom server. The remote server runs a headless `q-remote` daemon under `nohup`, so tasks continue uninterrupted even during a network disconnect. Your local terminal streams events from the remote in real time.
+
+### Prerequisites
+
+- **Remote server**: Linux with Node.js >= 22.19.0 installed and SSH access configured
+- **Local**: `ssh` and `scp` available on PATH, and an SSH key with access to the remote
+- **LLM credentials**: A cloud-accessible provider (local Ollama instances are rejected — the remote cannot reach your localhost)
+
+### Quick Start
+
+```bash
+# Connect to a remote server, upload your project, and start streaming
+q-cli ssh connect ec2-1-2-3-4.compute.amazonaws.com --user ubuntu --key ~/.ssh/id_ed25519
+
+# With Modus Maximus mode for large workflows
+q-cli ssh connect my-server --mode modus_maximus --yolo
+```
+
+The connect flow:
+1. Validates SSH connectivity and checks remote Node version
+2. Builds and uploads the `q-remote` package (not yet on npm — packed locally and installed via `npm install -g`)
+3. Collects and encrypts your LLM credentials (AES-256-GCM) and uploads them
+4. Uploads a streamlined, dependency-ignored snapshot of your project
+5. Launches the remote daemon under `nohup` (survives disconnect)
+6. Transitions your terminal to a remote-streaming TUI
+
+### Subcommands
+
+```bash
+# Reconnect to a running remote daemon and stream pending logs
+q-cli ssh resume <host> --session <id>
+
+# Bi-directional Git-like sync of code changes
+q-cli ssh sync <host> --session <id> --direction both --policy prompt
+
+# Dry-run sync (show what would change without applying)
+q-cli ssh sync <host> --session <id> --dry-run
+
+# Inject a prompt into a running remote session
+q-cli ssh run <host> "fix the failing tests" --session <id> --mode auto
+
+# Cancel the current remote task
+q-cli ssh run <host> --cancel --session <id>
+
+# List known remote sessions
+q-cli ssh sessions
+
+# Show remote daemon status
+q-cli ssh connect <host>  # (status is queried during connect)
+```
+
+### Security Model
+
+- **Encrypted credentials**: LLM API keys are encrypted with AES-256-GCM using a per-session passphrase. The passphrase is transmitted out-of-band via a separate SSH exec and is never written to disk in plaintext. The encrypted credential file is deleted on the remote after the daemon reads it.
+- **Ollama exclusion**: Local Ollama instances (provider `ollama` with a `localhost`/`127.0.0.1` base URL) are explicitly rejected — the remote server cannot reach your local Ollama. Configure a cloud-accessible Ollama URL or use a different provider.
+- **No credentials on disk**: The remote daemon decrypts credentials in memory and unlinks the encrypted file immediately.
+
+### Sync
+
+The bi-directional sync uses a manifest-based differential approach (not a Git clone — the remote workspace need not be a Git repo). Both sides compute a file manifest (path, size, mtime, sha256), compare them, and apply changes per the configured conflict policy:
+
+- `remote-wins`: remote version overwrites local
+- `local-wins`: local version overwrites remote
+- `prompt`: interactive resolution in the TUI
+- `merge`: 3-way merge using the initial snapshot as the common ancestor
+
+### Heartbeat and Reconnect
+
+The local client monitors connection health with automated heartbeat checks. On interruption, it retries with exponential backoff and logs each attempt. The remote daemon keeps running under `nohup` regardless of the local connection state — you can reconnect with `q-cli ssh resume` at any time.
+
+### File-Change Auditing
+
+Every file the remote agent creates, modifies, or deletes is logged to a strict audit trail and streamed to your local TUI. The audit log shows the action (create/modify/delete), the file path, and the size change.
+
+### Text-Based Visuals
+
+All progress indicators, loading animations, and instance metadata use text augmentation and ASCII box-drawing characters only — no icons or emoji, per the project conventions.
+
+### Troubleshooting
+
+- **Node version mismatch**: The remote requires Node >= 22.19.0. The connect flow checks this and errors with instructions if it is missing or too old.
+- **Firewall**: Ensure port 22 (SSH) is open between your machine and the remote.
+- **q-remote not found**: The connect flow builds and uploads q-remote automatically. If `q-remote --version` fails on the remote, check that the npm global bin directory is on the remote PATH.
+- **nohup survival**: The daemon uses a file-based control channel (`control.jsonl`), not stdin, so it survives `nohup ... &` without an open stdin.
+
+---
+
 ## License
 
 MIT

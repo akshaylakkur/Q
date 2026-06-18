@@ -39,6 +39,10 @@ import type {
   ToolCallBlockData,
 } from "./types.js";
 import { DEFAULT_COLORS } from "./types.js";
+import type { NdjsonEnvelope, RemoteSessionInfo } from "@qode-agent/protocol";
+import { InstanceMetadataComponent } from "./components/instance-metadata.js";
+import { HeartbeatBarComponent } from "./components/heartbeat-bar.js";
+import { AuditLogComponent } from "./components/audit-log.js";
 import { createMarkdownTheme } from "./theme.js";
 import { WelcomeComponent } from "./components/welcome.js";
 import { UserMessageComponent } from "./components/user-message.js";
@@ -137,7 +141,7 @@ export class QTui {
     setCurrentMode(mode: string): void;
     getCurrentMode(): string;
     resolveModusMaximusConfirmation?(response: { choice: "looks-good" | "needs-revision" | "redo"; revisionText?: string }): void;
-    submitPrompt?(prompt: string): Promise<import("../orchestrator/modes/types.js").ExecutionResult>;
+    submitPrompt?(prompt: string): Promise<import("@qode-agent/runtime").ExecutionResult>;
     cancel?(): void;
   };
 
@@ -145,6 +149,14 @@ export class QTui {
   private onExit?: () => Promise<void>;
   /** Dispose function for the global keyboard input listener */
   private disposeInputListener?: () => void;
+
+  // Remote mode (QSSH)
+  private isRemote = false;
+  private remoteSession?: { sendControl: (cmd: unknown) => Promise<void>; stopStream: () => void; shutdown: () => Promise<void> };
+  private remoteInfo?: RemoteSessionInfo;
+  private heartbeatBar?: HeartbeatBarComponent;
+  private auditLog?: AuditLogComponent;
+  private instanceMetadata?: InstanceMetadataComponent;
 
   constructor(options: TuiOptions) {
     this.agent = options.agent;
@@ -244,6 +256,104 @@ export class QTui {
     this.onExit = handler;
   }
 
+  // ── Remote Mode (QSSH) ──────────────────────────────────────────────
+
+  /**
+   * Attach a remote session. The TUI switches to remote-streaming mode:
+   * events from the remote daemon are fed into the existing handleAgentEvent
+   * pipeline, and user prompts are routed to the remote via sendControl.
+   */
+  attachRemote(
+    session: { sendControl: (cmd: unknown) => Promise<void>; stopStream: () => void; shutdown: () => Promise<void> },
+    info: RemoteSessionInfo,
+    onEvent: (handler: (env: NdjsonEnvelope) => void) => Promise<void>,
+  ): void {
+    this.isRemote = true;
+    this.remoteSession = session;
+    this.remoteInfo = info;
+    this.appState.isRemote = true;
+    this.appState.remoteInfo = info;
+
+    // Create the instance metadata + heartbeat + audit components
+    this.instanceMetadata = new InstanceMetadataComponent(info, this.colors);
+    this.heartbeatBar = new HeartbeatBarComponent(this.colors);
+    this.heartbeatBar.setRenderRequester(() => this.ui.requestRender());
+    this.heartbeatBar.start();
+    this.auditLog = new AuditLogComponent(this.colors);
+
+    // Render the metadata banner in the transcript
+    if (this.instanceMetadata) {
+      this.transcriptContainer.addChild(this.instanceMetadata);
+    }
+    this.ui.requestRender();
+
+    // Start streaming events — route them through the adapter to handleAgentEvent
+    void onEvent((env: NdjsonEnvelope) => {
+      this.handleRemoteEvent(env);
+    });
+  }
+
+  /**
+   * Handle a raw NDJSON envelope from the remote daemon.
+   * Routes system/audit/sync events to the appropriate TUI components,
+   * and agent/orchestrator events to the existing handleAgentEvent pipeline.
+   */
+  private handleRemoteEvent(env: NdjsonEnvelope): void {
+    // Heartbeat — update the bar
+    if (env.kind === "system" && env.type === "heartbeat") {
+      this.heartbeatBar?.noteBeat();
+      return;
+    }
+    // Metadata — already rendered on attach, but update info if needed
+    if (env.kind === "system" && env.type === "remote.metadata") {
+      return;
+    }
+    // Shutdown
+    if (env.kind === "system" && env.type === "shutdown") {
+      this.showStatus(`Remote daemon shutting down: ${String(env.message ?? env.reason ?? "")}`);
+      return;
+    }
+    // System status/warning
+    if (env.kind === "system") {
+      if (env.type === "warning") {
+        this.showError(String(env.message ?? "Remote warning"));
+      } else if (env.type === "ready") {
+        this.showStatus("Remote agent ready", "success");
+      } else if (env.type === "prompt.received") {
+        // Show the prompt as a user message
+        const text = String(env.text ?? "");
+        const userMsg = new UserMessageComponent(text, this.colors);
+        this.transcriptContainer.addChild(userMsg);
+      }
+      return;
+    }
+    // Audit events — add to the audit log
+    if (env.kind === "audit" && env.type.startsWith("file.")) {
+      this.auditLog?.addEntry({
+        ts: env.ts,
+        action: env.type.replace("file.", "") as "create" | "modify" | "delete" | "rename",
+        path: String(env.path ?? ""),
+        bytesAfter: typeof env.bytesAfter === "number" ? env.bytesAfter : undefined,
+        bytesBefore: typeof env.bytesBefore === "number" ? env.bytesBefore : undefined,
+      });
+      // Also show a status line
+      this.showStatus(`[audit] ${env.type.replace("file.", "")} ${String(env.path ?? "")}`, "plain");
+      return;
+    }
+    // Sync progress
+    if (env.kind === "sync") {
+      this.showStatus(`[sync] ${String(env.phase ?? "")} ${String(env.direction ?? "")} ${String(env.current ?? 0)}/${String(env.total ?? 0)}`, "plain");
+      return;
+    }
+    // Agent + orchestrator events — pass through to the existing handler
+    if (env.kind === "agent" || env.kind === "orchestrator") {
+      // Strip envelope wrapper fields and pass the rest as an AgentEvent
+      const { seq: _s, ts: _t, kind: _k, ...event } = env;
+      this.handleAgentEvent(event as AgentEvent);
+      return;
+    }
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────────
 
   async start(): Promise<void> {
@@ -274,6 +384,10 @@ export class QTui {
 
     // Stop context polling
     this.stopContextPolling();
+
+    // Stop remote-mode components
+    this.heartbeatBar?.stop();
+    this.remoteSession?.stopStream();
 
     // Cancel any active turn
     this.abortController?.abort();
@@ -992,6 +1106,23 @@ export class QTui {
     this.transcriptContainer.addChild(userMsg);
     this.ui.requestRender();
 
+    // ── Remote mode: route the prompt to the remote daemon via sendControl ──
+    if (this.isRemote && this.remoteSession) {
+      this.isProcessing = true;
+      this.appState.streamingPhase = "waiting";
+      this.showStatus("Sending to remote agent...", "info");
+      try {
+        const mode = this.appState.executionMode === "modus-maximus" ? "modus_maximus" : "auto";
+        await this.remoteSession.sendControl({ cmd: "prompt", text, mode });
+        // The remote daemon will process it and stream events back.
+        // We set isProcessing=false when the turn.ended event arrives.
+      } catch (err) {
+        this.showError(`Failed to send to remote: ${err instanceof Error ? err.message : String(err)}`);
+        this.isProcessing = false;
+      }
+      return;
+    }
+
     // ── Modus Maximus: route through orchestrator for mode-aware execution ──
     // When modus-maximus is active, the orchestrator handles the full pipeline
     // including planning, sub-agent orchestration, and review.
@@ -1060,6 +1191,13 @@ export class QTui {
   }
 
   cancelCurrentTurn(): void {
+    // Remote mode: send a cancel control command to the remote daemon
+    if (this.isRemote && this.remoteSession) {
+      this.showStatus("Cancelling remote task...");
+      void this.remoteSession.sendControl({ cmd: "cancel" });
+      return;
+    }
+
     // During modus-maximus mode, cancel via the orchestrator
     const isCampaignMode =
       this.appState.executionMode === "modus-maximus";

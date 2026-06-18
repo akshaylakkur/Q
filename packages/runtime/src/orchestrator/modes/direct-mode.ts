@@ -10,7 +10,7 @@ import { ExecutionModes } from "./index.js";
 import type { ExecutionMode } from "./index.js";
 import type { Task, ExecutionResult } from "./types.js";
 import type { OrchestratorCore } from "../core.js";
-import { runAgentTurn } from "../../agent/wiring.js";
+import { runAgentTurn } from "../../agent/agent-factory.js";
 
 const CONFIG_HOWTO = `⚠️  No LLM provider configured.
 

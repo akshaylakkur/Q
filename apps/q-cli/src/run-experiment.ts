@@ -7,7 +7,7 @@
  * Or edit the PROMPT and PROJECT_DIR variables below directly.
  */
 
-import { createAgent } from "./agent/wiring.js";
+import { createAgent } from "@qode-agent/runtime";
 import { resolve } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
 import { readdirSync, statSync } from "node:fs";

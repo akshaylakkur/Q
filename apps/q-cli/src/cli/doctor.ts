@@ -26,12 +26,12 @@ import type { Command } from "commander";
 import { discoverConfig, getQHome } from "./config-discover.js";
 import {
   safeParseVConfig,
+  PluginManifestSchema,
+  McpConnectionManager,
   type VConfig,
   type ProviderConfig,
-} from "../config/schema.js";
-import { PluginManifestSchema } from "../plugins/types.js";
-import { McpConnectionManager } from "../mcp/manager.js";
-import type { McpServerConfig } from "../config/schema.js";
+  type McpServerConfig,
+} from "@qode-agent/runtime";
 
 // ─── ICONS from Step 3's TUI system ─────────────────────────────────────────
 

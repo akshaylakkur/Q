@@ -18,6 +18,6 @@ export * from "./migrate.js";
 export * from "./update.js";
 export * from "./completions.js";
 export * from "./daemon.js";
-export * from "./connect.js";
+export * from "./ssh.js";
 export * from "./profile.js";
 export * from "./plugin.js";

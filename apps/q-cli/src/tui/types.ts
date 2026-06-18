@@ -27,6 +27,12 @@ export interface TuiAppState {
   modusMaximusPhase: "idle" | "planning" | "confirming" | "executing" | "summarizing";
   /** Current active agent profile name (editius, rewritius, searchius, auto) */
   activeAgent: string;
+  /** Whether this TUI is in remote-streaming mode (QSSH). */
+  isRemote: boolean;
+  /** Remote session info (when isRemote is true). */
+  remoteInfo?: import("@qode-agent/protocol").RemoteSessionInfo;
+  /** Connection health when in remote mode. */
+  connectionHealth?: import("@qode-agent/protocol").ConnectionHealth;
 }
 
 // ── Transcript Entries ─────────────────────────────────────────────────
@@ -177,7 +183,7 @@ export interface TuiOptions {
 }
 
 // Import ExecutionResult type for the orchestrator interface
-import type { ExecutionResult } from "../orchestrator/modes/types.js";
+import type { ExecutionResult } from "@qode-agent/runtime";
 
 // ── Theme Colors ───────────────────────────────────────────────────────
 

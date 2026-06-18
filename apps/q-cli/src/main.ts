@@ -13,15 +13,11 @@ import { registerMigrateCommand } from "./cli/migrate.js";
 import { registerUpdateCommand } from "./cli/update.js";
 import { registerCompletionsCommand } from "./cli/completions.js";
 import { registerDaemonCommand } from "./cli/daemon.js";
-import { registerConnectCommand } from "./cli/connect.js";
+import { registerSshCommand } from "./cli/ssh.js";
 import { handleQmdInteractive } from "./tui/commands/qmd.js";
 import { registerProfileCommand } from "./cli/profile.js";
 import { registerPluginCommand } from "./cli/plugin.js";
-import { OrchestratorCore } from "./orchestrator/core.js";
-import { PluginManager } from "./plugins/plugin-manager.js";
-import { SkillRegistry } from "./skills/registry.js";
-import { McpConnectionManager } from "./mcp/manager.js";
-import { createAgent, resolveProviderConfig } from "./agent/wiring.js";
+import { OrchestratorCore, PluginManager, SkillRegistry, McpConnectionManager, createAgent, resolveProviderConfig } from "@qode-agent/runtime";
 import { checkFirstRun, OnboardingWizard, clearOnboardingComplete } from "./onboarding/index.js";
 import { startTui } from "./tui/index.js";
 
@@ -127,7 +123,7 @@ function registerAllCommands(prog: Command): void {
   registerUpdateCommand(prog);
   registerCompletionsCommand(prog);
   registerDaemonCommand(prog);
-  registerConnectCommand(prog);
+  registerSshCommand(prog);
   registerProfileCommand(prog);
   registerPluginCommand(prog);
 }

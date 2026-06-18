@@ -3,9 +3,7 @@ import { resolve, dirname } from "node:path";
 import chalk from "chalk";
 import type { Command } from "commander";
 import { discoverConfig } from "./config-discover.js";
-import { ConfigStore } from "../config/store.js";
-import { findProjectConfig, parseTomlFile } from "../config/resolver.js";
-import { getByDotPath, setByDotPath } from "../config/merge.js";
+import { ConfigStore, findProjectConfig, parseTomlFile, getByDotPath, setByDotPath } from "@qode-agent/runtime";
 
 /**
  * `q-cli config` — Configuration management.
