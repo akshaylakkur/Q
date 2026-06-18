@@ -24,6 +24,7 @@ import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { writeSync } from "node:fs";
+import { getCliVersion } from "../../version.js";
 
 // ─── sshConnect ───────────────────────────────────────────────────────────────
 
@@ -245,7 +246,7 @@ async function launchDaemonAndAttach(
     workDir: opts.workDir,
     sessionId,
     model: providerCfg?.model ?? "remote",
-    version: "0.1.0",
+    version: getCliVersion(),
     permissionMode: opts.yolo ? "yolo" : "auto",
     planMode: false,
     yolo: opts.yolo ?? false,

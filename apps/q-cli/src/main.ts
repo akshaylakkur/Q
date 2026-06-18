@@ -17,6 +17,7 @@ import { registerSshCommand } from "./cli/ssh.js";
 import { handleQmdInteractive } from "./tui/commands/qmd.js";
 import { registerProfileCommand } from "./cli/profile.js";
 import { registerPluginCommand } from "./cli/plugin.js";
+import { getCliVersion } from "./version.js";
 import { OrchestratorCore, PluginManager, SkillRegistry, McpConnectionManager, createAgent, resolveProviderConfig } from "@qode-agent/runtime";
 import { checkFirstRun, OnboardingWizard, clearOnboardingComplete } from "./onboarding/index.js";
 import { startTui } from "./tui/index.js";
@@ -90,7 +91,7 @@ function createProgram(): Command {
   const prog = program
     .name("q-cli")
     .description("Qode — Autonomous Coding Agent")
-    .version("0.1.0");
+    .version(getCliVersion());
 
   prog
     .option("-C, --continue", "Continue the last session")
@@ -184,7 +185,7 @@ async function runPromptMode(
   opts: CliOptions,
   startup: { projectRoot: string; vDir: string | null; initialized: boolean },
 ): Promise<void> {
-  console.log(chalk.cyan("Qode — Autonomous Coding Agent v0.1.0"));
+  console.log(chalk.cyan(`Qode — Autonomous Coding Agent v${getCliVersion()}`));
   const providerCfg = resolveProviderConfig(startup.projectRoot);
   if (!providerCfg) {
     console.log(chalk.red("✗ No provider configured. Set Q_PROVIDER, Q_MODEL, Q_API_KEY env vars."));
@@ -292,7 +293,7 @@ async function startTuiSession(
     workDir: startup.projectRoot,
     sessionId,
     model: providerCfg.model,
-    version: "0.1.0",
+    version: getCliVersion(),
     permissionMode: opts.yolo ? "yolo" : opts.auto ? "auto" : "manual",
     planMode: opts.plan ?? false,
     yolo: opts.yolo ?? false,
@@ -325,7 +326,7 @@ async function startInteractiveSession(startup: {
   vDir: string | null;
   initialized: boolean;
 }): Promise<void> {
-  console.log(chalk.cyan("Qode — Autonomous Coding Agent v0.1.0"));
+  console.log(chalk.cyan(`Qode — Autonomous Coding Agent v${getCliVersion()}`));
   console.log(chalk.dim("  Interactive mode. Type /help for commands, /exit to quit."));
   console.log();
   const providerCfg = resolveProviderConfig(startup.projectRoot);

@@ -22,8 +22,32 @@
 import { spawn, execFile, type ChildProcess } from "node:child_process";
 import { createInterface, type Interface as ReadlineInterface } from "node:readline";
 import { readdir, access } from "node:fs/promises";
-import { resolve, extname, basename } from "node:path";
+import { resolve, extname, basename, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
+
+// ── Read version from package.json ──────────────────────────────────────
+let _lspVersion: string | null = null;
+function getLspVersion(): string {
+  if (_lspVersion) return _lspVersion;
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const candidates = [
+      resolve(__dirname, "..", "..", "package.json"),
+      resolve(__dirname, "..", "..", "..", "package.json"),
+    ];
+    for (const p of candidates) {
+      if (existsSync(p)) {
+        const pkg = JSON.parse(readFileSync(p, "utf-8"));
+        if (pkg.version) { _lspVersion = pkg.version; return _lspVersion; }
+      }
+    }
+  } catch { /* fall through */ }
+  _lspVersion = "0.0.0-dev";
+  return _lspVersion;
+}
 
 // =========================================================================
 // Types
@@ -450,7 +474,7 @@ export class LspClient extends EventEmitter {
         const initId = this.nextId();
         this.sendRawRequest(initId, "initialize", {
           processId: process.pid,
-          clientInfo: { name: "q-cli", version: "0.1.0" },
+          clientInfo: { name: "q-cli", version: getLspVersion() },
           capabilities: TEXT_DOCUMENT_SYNC_CAPABILITIES,
           rootUri: `file://${resolve(this.rootPath)}`,
           initializationOptions: this.initOptions,

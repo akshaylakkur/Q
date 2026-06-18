@@ -20,6 +20,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { writeSync } from "node:fs";
+import { getCliVersion } from "../../version.js";
 
 export interface ResumeOptions {
   session?: string;
@@ -116,7 +117,7 @@ export async function sshResume(
     workDir,
     sessionId,
     model: providerCfg?.model ?? "remote",
-    version: "0.1.0",
+    version: getCliVersion(),
     permissionMode: opts.yolo ? "yolo" : "auto",
     planMode: false,
     yolo: opts.yolo ?? false,

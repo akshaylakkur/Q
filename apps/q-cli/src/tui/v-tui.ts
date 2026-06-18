@@ -59,10 +59,11 @@ import { dispatchInput, ALL_SLASH_COMMANDS, sortSlashCommands, type SlashCommand
 import { ConfirmationDropdownComponent } from "./components/confirmation-dropdown.js";
 import { RevisionInputComponent } from "./components/revision-input.js";
 import { PlanModeController, PlanDropdownComponent, PlanRevisionInputComponent } from "./plan/index.js";
+import { getCliVersion } from "../version.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-const VERSION = "0.1.0";
+const VERSION = getCliVersion();
 
 /**
  * Interval at which we poll agent.context.messages to catch tool calls

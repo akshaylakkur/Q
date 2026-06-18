@@ -33,8 +33,9 @@ fi
 # Step 2: Test version
 echo "[2/6] Testing q-remote version..."
 VER=$(node "$QREMOTE" version)
-if [ "$VER" != "0.1.0" ]; then
-  echo "FAIL: expected version 0.1.0, got $VER"
+EXPECTED_VER=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$ROOT/packages/q-remote/package.json','utf-8')).version)")
+if [ "$VER" != "$EXPECTED_VER" ]; then
+  echo "FAIL: expected version $EXPECTED_VER, got $VER"
   exit 1
 fi
 echo "  Version: $VER"
