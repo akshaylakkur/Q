@@ -302,6 +302,9 @@ export class RemoteDaemon {
       case "set-mode":
         this.handleSetMode(cmd);
         break;
+      case "confirm":
+        this.handleConfirm(cmd);
+        break;
       case "shutdown":
         this.eventBridge.emitShutdown("graceful", "Shutdown requested by client");
         this.shutdown(0);
@@ -313,11 +316,28 @@ export class RemoteDaemon {
     }
   }
 
+  /**
+   * Normalize a mode string from the protocol (snake_case, lowercase)
+   * to the runtime constant (SCREAMING_SNAKE_CASE, uppercase).
+   *
+   * Protocol sends: "auto" | "modus_maximus"
+   * Runtime expects: "AUTO" | "MODUS_MAXIMUS"
+   */
+  private normalizeMode(mode: string | undefined): string {
+    if (!mode) return this.currentMode;
+    switch (mode) {
+      case "auto": return "AUTO";
+      case "modus_maximus": return "MODUS_MAXIMUS";
+      default: return mode.toUpperCase();
+    }
+  }
+
   private async handlePrompt(cmd: ControlCommand): Promise<void> {
     if (!this.orchestrator) return;
     const text = String((cmd as { text?: string }).text ?? "");
-    const mode = (cmd as { mode?: string }).mode ?? this.currentMode;
-    if (mode && (mode === "modus_maximus" || mode === "auto")) {
+    const rawMode = (cmd as { mode?: string }).mode;
+    const mode = this.normalizeMode(rawMode);
+    if (mode && (mode === "AUTO" || mode === "MODUS_MAXIMUS")) {
       this.currentMode = mode;
     }
     this.sessionManager.recordPrompt(this.opts.sessionId, text, this.currentMode);
@@ -348,10 +368,31 @@ export class RemoteDaemon {
   }
 
   private handleSetMode(cmd: ControlCommand): void {
-    const mode = (cmd as { mode?: string }).mode;
-    if (mode) {
-      this.currentMode = mode;
-      this.eventBridge.emit("system", "mode.changed", { mode });
+    const rawMode = (cmd as { mode?: string }).mode;
+    if (rawMode) {
+      this.currentMode = this.normalizeMode(rawMode);
+      this.eventBridge.emit("system", "mode.changed", { mode: this.currentMode });
+    }
+  }
+
+  /**
+   * Handle a confirmation response from the TUI (modus-maximus plan review).
+   * Forwards the choice to the orchestrator's ModusMaximusMode handler.
+   */
+  private handleConfirm(cmd: ControlCommand): void {
+    const c = cmd as { choice?: string; revisionText?: string };
+    if (!c.choice) return;
+    const response: { choice: "looks-good" | "needs-revision" | "redo"; revisionText?: string } = {
+      choice: c.choice as any,
+      revisionText: c.revisionText,
+    };
+    this.eventBridge.emit("system", "confirm.received", { choice: c.choice });
+    try {
+      this.orchestrator?.resolveModusMaximusConfirmation(response);
+    } catch (err) {
+      this.eventBridge.emit("system", "warning", {
+        message: `Confirm handler error: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 }

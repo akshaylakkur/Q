@@ -104,7 +104,8 @@ export type ControlCmdName =
   | "shutdown"
   | "sync-diff"
   | "sync-apply"
-  | "set-mode";
+  | "set-mode"
+  | "confirm";
 
 export interface ControlCommand {
   cmd: ControlCmdName;
@@ -141,6 +142,12 @@ export interface SyncDiffControlCommand extends ControlCommand {
 export interface SyncApplyControlCommand extends ControlCommand {
   cmd: "sync-apply";
   patchPath: string;
+}
+
+export interface ConfirmControlCommand extends ControlCommand {
+  cmd: "confirm";
+  choice: "looks-good" | "needs-revision" | "redo";
+  revisionText?: string;
 }
 
 // ─── Remote Status Response ───────────────────────────────────────────────

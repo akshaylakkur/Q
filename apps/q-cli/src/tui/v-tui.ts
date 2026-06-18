@@ -1531,7 +1531,12 @@ Follow the plan carefully. Complete each step before moving to the next.`;
       } else {
         // Looks good or Redo — resolve the confirmation
         this.restoreEditor();
-        if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
+        if (this.isRemote && this.remoteSession) {
+          // Remote mode: send confirmation via control command
+          this.remoteSession.sendControl({ cmd: "confirm", choice }).catch((err) => {
+            this.showError(`Failed to send confirmation: ${err.message}`);
+          });
+        } else if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
           this.orchestratorHost.resolveModusMaximusConfirmation({ choice });
         }
       }
@@ -1540,7 +1545,11 @@ Follow the plan carefully. Complete each step before moving to the next.`;
     dropdown.setOnCancel(() => {
       // Cancel = choose Redo
       this.restoreEditor();
-      if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
+      if (this.isRemote && this.remoteSession) {
+        this.remoteSession.sendControl({ cmd: "confirm", choice: "redo" }).catch((err) => {
+          this.showError(`Failed to send confirmation: ${err.message}`);
+        });
+      } else if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
         this.orchestratorHost.resolveModusMaximusConfirmation({ choice: "redo" });
       }
     });
@@ -1556,7 +1565,11 @@ Follow the plan carefully. Complete each step before moving to the next.`;
 
     revisionInput.setOnSubmit((text) => {
       this.restoreEditor();
-      if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
+      if (this.isRemote && this.remoteSession) {
+        this.remoteSession.sendControl({ cmd: "confirm", choice: "needs-revision", revisionText: text }).catch((err) => {
+          this.showError(`Failed to send confirmation: ${err.message}`);
+        });
+      } else if (this.orchestratorHost?.resolveModusMaximusConfirmation) {
         this.orchestratorHost.resolveModusMaximusConfirmation({
           choice: "needs-revision",
           revisionText: text,

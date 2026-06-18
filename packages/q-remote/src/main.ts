@@ -161,7 +161,8 @@ async function runDaemon(flags: Record<string, string>): Promise<void> {
   const credsPath = flags.creds;
   let passphrase = flags.passphrase;
   const passphraseFile = flags["passphrase-file"];
-  const mode = flags.mode ?? "auto";
+  const rawMode = flags.mode ?? "auto";
+  const mode = rawMode === "modus_maximus" ? "MODUS_MAXIMUS" : rawMode === "auto" ? "AUTO" : rawMode;
   const permissionMode = (flags.permission ?? "yolo") as "manual" | "yolo" | "auto";
 
   // Read passphrase from file if --passphrase-file is given (avoids shell escaping issues)
@@ -252,7 +253,9 @@ async function runOneShot(flags: Record<string, string>): Promise<void> {
     await orch.initMemorySystem(sessionId);
   } catch { /* non-fatal */ }
 
-  orch.currentMode = mode as any;
+  // Normalize mode: CLI sends "modus_maximus" but runtime expects "MODUS_MAXIMUS"
+  const normalizedMode = mode === "modus_maximus" ? "MODUS_MAXIMUS" : mode === "auto" ? "AUTO" : mode;
+  orch.currentMode = normalizedMode as any;
   const result = await orch.submitPrompt(prompt);
   eventBridge.emit("orchestrator", "prompt.complete", {
     success: result.success,

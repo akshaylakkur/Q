@@ -21,6 +21,7 @@ export default defineConfig({
       "@qode-agent/qprovs",
       "@qode-agent/qmain",
       "@qode-agent/protocol",
+      "ignore",
     ],
   },
 });
