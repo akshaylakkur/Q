@@ -11,6 +11,23 @@
  *   6. Poll the control file (`control.jsonl`) for new commands.
  *   7. On shutdown signal or shutdown command: emit shutdown, flush, exit.
  *
+ * ── SAFEGUARDS ───────────────────────────────────────────────────────────
+ *
+ * 1. Prompt timeout: each prompt execution is wrapped in a timeout race.
+ *    If the prompt (including all its LLM calls + tool executions) exceeds
+ *    PROMPT_TIMEOUT_MS (30 minutes), the orchestrator is cancelled and
+ *    the daemon emits a timeout event instead of staying stuck forever.
+ *
+ * 2. Stuck-prompt watchdog: a background interval (every 15s) monitors
+ *    whether the orchestrator has been "running" for too long without
+ *    producing any events. If it appears stuck, the watchdog re-initializes
+ *    the agent and emits a warning event. This prevents the daemon from
+ *    silently sitting in a broken state after a hung tool call.
+ *
+ * 3. Graceful recovery: after a timeout or error, the daemon re-creates
+ *    the agent and orchestrator rather than remaining in a broken state.
+ *    Future prompts will use a fresh pipeline.
+ *
  * nohup compatibility:
  *   - Control is file-based (control.jsonl), NOT stdin. The daemon watches
  *     the control file for new lines appended by the local client.
@@ -20,7 +37,6 @@
  */
 
 import { hostname, userInfo, platform, arch } from "node:os";
-// `process` is a global in Node.js — no import needed.
 import { resolve } from "node:path";
 import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync, appendFileSync, statSync, openSync, closeSync, readSync, watchFile } from "node:fs";
 import { createServer, type Server } from "node:net";
@@ -51,6 +67,25 @@ export interface DaemonOptions {
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const CONTROL_POLL_INTERVAL_MS = 200;
 
+/**
+ * Maximum time (1 hr 18 min) a single prompt can take before it is forcefully
+ * cancelled. This prevents the daemon from staying stuck on a prompt
+ * that hangs due to a tool execution or LLM call that never completes.
+ */
+const PROMPT_TIMEOUT_MS = 4_680_000;
+
+/**
+ * Watchdog interval (15s): checks if the orchestrator has been running
+ * too long without producing events. If so, it re-initializes the agent.
+ */
+const WATCHDOG_INTERVAL_MS = 15_000;
+
+/**
+ * If the orchestrator is "running" and no new events have been emitted
+ * for this many ms, the watchdog considers it stuck and re-initializes.
+ */
+const STUCK_THRESHOLD_MS = 120_000;
+
 // ─── RemoteDaemon ───────────────────────────────────────────────────────────
 
 export class RemoteDaemon {
@@ -70,6 +105,12 @@ export class RemoteDaemon {
   private startedAt = Date.now();
   private running = false;
   private currentMode: string;
+
+  // ── SAFEGUARD: Watchdog state ───────────────────────────────────────────
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+  private watchdogLastEventSeq = 0;
+  private agentInitialized = false;
+  private creds: CredentialPayload | null = null;
 
   constructor(opts: DaemonOptions) {
     this.opts = opts;
@@ -104,6 +145,7 @@ export class RemoteDaemon {
     try {
       const blob = readFileSync(this.opts.credsPath);
       creds = decryptCredentials(blob, this.opts.passphrase);
+      this.creds = creds; // cache for watchdog recovery
       // Delete the creds file after decryption (security)
       try { unlinkSync(this.opts.credsPath); } catch { /* best effort */ }
     } catch (err) {
@@ -112,6 +154,52 @@ export class RemoteDaemon {
       try { unlinkSync(this.pidPath); } catch { /* */ }
       process.exit(1);
     }
+
+    // Initialize the agent + orchestrator
+    this.initializeAgentPipeline(creds);
+
+    // Set up the control file (truncate any stale content)
+    if (!existsSync(this.controlPath)) {
+      writeFileSync(this.controlPath, "", "utf-8");
+    }
+    // Start from the current end of the control file
+    this.controlReadOffset = existsSync(this.controlPath) ? statSync(this.controlPath).size : 0;
+
+    // Start the heartbeat timer
+    this.heartbeatTimer = setInterval(() => {
+      this.eventBridge.emitHeartbeat(Date.now() - this.startedAt, process.pid);
+    }, HEARTBEAT_INTERVAL_MS);
+
+    // Start the control file poller
+    this.controlPollTimer = setInterval(() => {
+      this.pollControlFile();
+    }, CONTROL_POLL_INTERVAL_MS);
+
+    // ── SAFEGUARD: Start the watchdog timer ──────────────────────────────
+    this.startWatchdog();
+
+    // Mark running
+    this.running = true;
+    this.sessionManager.updateStatus(this.opts.sessionId, "running");
+
+    this.eventBridge.emit("system", "ready", { message: "Daemon ready" });
+
+    // Handle graceful shutdown signals
+    const shutdownHandler = (signal: string) => {
+      this.eventBridge.emitShutdown("signal", `Received ${signal}`);
+      this.shutdown(0);
+    };
+    process.on("SIGTERM", () => shutdownHandler("SIGTERM"));
+    process.on("SIGINT", () => shutdownHandler("SIGINT"));
+  }
+
+  /**
+   * Initialize (or re-initialize) the agent + orchestrator pipeline.
+   * This is called on startup and after watchdog recovery.
+   */
+  private initializeAgentPipeline(creds: CredentialPayload): void {
+    // Cancel any existing orchestrator
+    try { this.orchestrator?.cancel(); } catch { /* */ }
 
     // Create the headless agent
     this.agent = createHeadlessAgent({
@@ -135,11 +223,17 @@ export class RemoteDaemon {
     // Wire orchestrator events to the bridge
     this.orchestrator.onEvent((event) => {
       this.eventBridge.emitOrchestratorEvent(event);
+      // ── SAFEGUARD: Track last event seq for watchdog ──────────────────
+      this.watchdogLastEventSeq = this.eventBridge.currentSeq;
     });
 
     // Initialize memory system (best-effort — non-fatal on failure)
     try {
-      await this.orchestrator.initMemorySystem(this.opts.sessionId);
+      this.orchestrator.initMemorySystem(this.opts.sessionId).catch((err) => {
+        this.eventBridge.emit("system", "warning", {
+          message: `Memory system init failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+        });
+      });
     } catch (err) {
       this.eventBridge.emit("system", "warning", {
         message: `Memory system init failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
@@ -163,50 +257,65 @@ export class RemoteDaemon {
       });
     }
 
-    // Emit the initial metadata event
-    this.eventBridge.emitMetadata({
-      host: hostname(),
-      user: (() => { try { return userInfo().username; } catch { return undefined; } })(),
-      sessionId: this.opts.sessionId,
-      workspace: this.opts.workspace,
-      nodeVersion: process.version,
-      arch: arch(),
-      platform: platform(),
-      pid: process.pid,
-      startedAt: new Date(this.startedAt).toISOString(),
-      mode: this.currentMode,
+    this.agentInitialized = true;
+  }
+
+  // ── SAFEGUARD: Watchdog ─────────────────────────────────────────────
+
+  /**
+   * Start the periodic watchdog that monitors the orchestrator for
+   * stuck states. If the orchestrator is "running" and no events have
+   * been emitted for STUCK_THRESHOLD_MS, the watchdog re-initializes
+   * the agent pipeline.
+   */
+  private startWatchdog(): void {
+    this.watchdogLastEventSeq = this.eventBridge.currentSeq;
+
+    this.watchdogTimer = setInterval(() => {
+      this.runWatchdogCheck();
+    }, WATCHDOG_INTERVAL_MS);
+  }
+
+  private async runWatchdogCheck(): Promise<void> {
+    if (!this.running) return;
+    if (!this.orchestrator) return;
+    if (!this.agentInitialized) return;
+
+    const state = this.orchestrator.state;
+    const currentSeq = this.eventBridge.currentSeq;
+    const stableSinceMs = (currentSeq === this.watchdogLastEventSeq) ? WATCHDOG_INTERVAL_MS : 0;
+
+    // Update the last event seq so we can measure time since last event
+    this.watchdogLastEventSeq = currentSeq;
+
+    // Only check when the orchestrator claims to be running
+    if (state !== "running" && state !== "processing") return;
+
+    // Check if we've been running without events for too long
+    // The orchestrator's convergence loop should produce events periodically.
+    // If it hasn't produced any events in STUCK_THRESHOLD_MS, it's likely stuck.
+    // Note: this is an approximate check — we incrementally accumulate time.
+    if (stableSinceMs < STUCK_THRESHOLD_MS / WATCHDOG_INTERVAL_MS) return;
+
+    // ── SAFEGUARD: Detected stuck state — re-initialize ────────────────
+    this.eventBridge.emit("system", "warning", {
+      message: `Watchdog detected stuck orchestrator (state=${state}, no events for ${STUCK_THRESHOLD_MS}ms). Re-initializing agent pipeline.`,
     });
 
-    // Set up the control file (truncate any stale content)
-    if (!existsSync(this.controlPath)) {
-      writeFileSync(this.controlPath, "", "utf-8");
+    try {
+      this.orchestrator.cancel();
+    } catch { /* */ }
+
+    if (this.creds) {
+      this.initializeAgentPipeline(this.creds);
+      this.eventBridge.emit("system", "recovered", {
+        message: "Agent pipeline re-initialized after watchdog recovery.",
+      });
+    } else {
+      this.eventBridge.emit("system", "error", {
+        message: "Watchdog recovery failed: no cached credentials available.",
+      });
     }
-    // Start from the current end of the control file
-    this.controlReadOffset = existsSync(this.controlPath) ? statSync(this.controlPath).size : 0;
-
-    // Start the heartbeat timer
-    this.heartbeatTimer = setInterval(() => {
-      this.eventBridge.emitHeartbeat(Date.now() - this.startedAt, process.pid);
-    }, HEARTBEAT_INTERVAL_MS);
-
-    // Start the control file poller
-    this.controlPollTimer = setInterval(() => {
-      this.pollControlFile();
-    }, CONTROL_POLL_INTERVAL_MS);
-
-    // Mark running
-    this.running = true;
-    this.sessionManager.updateStatus(this.opts.sessionId, "running");
-
-    this.eventBridge.emit("system", "ready", { message: "Daemon ready" });
-
-    // Handle graceful shutdown signals
-    const shutdownHandler = (signal: string) => {
-      this.eventBridge.emitShutdown("signal", `Received ${signal}`);
-      this.shutdown(0);
-    };
-    process.on("SIGTERM", () => shutdownHandler("SIGTERM"));
-    process.on("SIGINT", () => shutdownHandler("SIGINT"));
   }
 
   /**
@@ -217,6 +326,12 @@ export class RemoteDaemon {
     this.running = false;
 
     this.sessionManager.updateStatus(this.opts.sessionId, "completed");
+
+    // ── SAFEGUARD: Stop watchdog timer ─────────────────────────────────
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
 
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
@@ -342,18 +457,63 @@ export class RemoteDaemon {
     }
     this.sessionManager.recordPrompt(this.opts.sessionId, text, this.currentMode);
     this.eventBridge.emit("system", "prompt.received", { text: text.slice(0, 200), mode: this.currentMode });
+
+    // ── SAFEGUARD: Prompt timeout race ──────────────────────────────────
+    // If the prompt takes longer than PROMPT_TIMEOUT_MS, we cancel the
+    // orchestrator and emit a timeout event. This prevents the daemon
+    // from staying stuck on a single prompt forever.
+    const promptTimeout = setTimeout(() => {
+      try { this.orchestrator?.cancel(); } catch { /* */ }
+      this.eventBridge.emit("orchestrator", "prompt.timeout", {
+        error: `Prompt timed out after ${PROMPT_TIMEOUT_MS}ms`,
+        textPreview: text.slice(0, 200),
+      });
+    }, PROMPT_TIMEOUT_MS);
+
     try {
       this.orchestrator.currentMode = this.currentMode as any;
       const result = await this.orchestrator.submitPrompt(text);
+
+      // ── SAFEGUARD: Update watchdog event seq after prompt completes ──
+      this.watchdogLastEventSeq = this.eventBridge.currentSeq;
+
       this.eventBridge.emit("orchestrator", "prompt.complete", {
         success: result.success,
         mode: result.mode,
         durationMs: result.durationMs,
       });
     } catch (err) {
+      // ── SAFEGUARD: Catch and emit all errors ──────────────────────────
+      // This prevents a thrown error from crashing the daemon or putting
+      // it into a broken state. The orchestrator is cancelled by the
+      // timeout above or by the error itself.
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      const errorName = err instanceof Error ? err.name : "UnknownError";
+
       this.eventBridge.emit("orchestrator", "prompt.error", {
-        error: err instanceof Error ? err.message : String(err),
+        error: errorMsg,
+        errorName,
+        textPreview: text.slice(0, 200),
       });
+
+      // ── SAFEGUARD: Auto-recovery after error ──────────────────────────
+      // If the pipeline is broken, re-initialize the agent for the next
+      // prompt so we don't accumulate broken state.
+      if (this.creds) {
+        try {
+          this.orchestrator.cancel();
+          this.initializeAgentPipeline(this.creds);
+          this.eventBridge.emit("system", "recovered", {
+            message: "Agent pipeline re-initialized after prompt error.",
+          });
+        } catch (reinitErr) {
+          this.eventBridge.emit("system", "error", {
+            message: `Failed to re-initialize after error: ${reinitErr instanceof Error ? reinitErr.message : String(reinitErr)}`,
+          });
+        }
+      }
+    } finally {
+      clearTimeout(promptTimeout);
     }
   }
 

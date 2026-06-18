@@ -23,6 +23,22 @@ import type {
   ToolInputDisplay,
 } from "./types.js";
 
+/**
+ * Maximum time any single tool execution is allowed to take (10 minutes).
+ * This is a hard ceiling enforced by an independent AbortController in
+ * the tool execution path. If a tool execution exceeds this, it is
+ * aborted regardless of any other timers. This prevents a single
+ * misbehaving tool from blocking the entire agent loop.
+ *
+ * Note: the Bash tool has its own 6-minute ceiling (see tool/index.ts),
+ * so this 10-minute ceiling is a safety net for any other tool.
+ */
+const MAX_TOOL_TIMEOUT_MS = 600_000;
+
+/**
+ * Grace period (2s) after the parent signal aborts. We give the tool
+ * a short window to finish its current operation before force-aborting.
+ */
 const GRACE_TIMEOUT_MS = 2_000;
 const TOOL_OUTPUT_EMPTY = "Tool output is empty.";
 const TOOL_OUTPUT_CAP = 100_000;
@@ -458,7 +474,60 @@ async function executeTool(
       } as never);
     },
   });
-  return raceExecuteWithGraceTimeout(executePromise, signal, toolName);
+
+  // ── SAFEGUARD: Per-tool hard timeout ─────────────────────────────────────
+  // Race the execution against MAX_TOOL_TIMEOUT_MS (10 minutes). If the
+  // tool exceeds this, it is forcefully aborted. This catches cases where:
+  //   - The underlying process ignores the timeout parameter
+  //   - The LLM requests a very long timeout that turns out to be too long
+  //   - The tool hangs in an infinite loop
+  //
+  // This is a safety net IN ADDITION TO the tool's own timeout mechanisms
+  // (e.g. the Bash tool's 6-minute hard ceiling enforced in tool/index.ts).
+  const toolHardTimeout = new Promise<ExecutableToolResult>((resolve) => {
+    const timer = setTimeout(() => {
+      resolve({
+        output: `Tool "${toolName}" exceeded the hard timeout of ${MAX_TOOL_TIMEOUT_MS}ms and was aborted.`,
+        isError: true,
+        stopTurn: true,
+      });
+    }, MAX_TOOL_TIMEOUT_MS);
+
+    // Cancel the hard timeout if the parent signal fires
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve({
+        output: `Tool "${toolName}" was aborted by the parent signal.`,
+        isError: true,
+        stopTurn: true,
+      });
+    };
+    if (signal.aborted) {
+      clearTimeout(timer);
+      return resolve({
+        output: `Tool "${toolName}" was aborted before execution.`,
+        isError: true,
+        stopTurn: true,
+      });
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+
+  // ── SAFEGUARD: Grace timeout after abort ────────────────────────────────
+  // If the signal aborts, we give the tool a short grace period (GRACE_TIMEOUT_MS)
+  // to finish its current operation before force-resolving with an error.
+  // This is layered on top of the hard timeout for abort scenarios.
+  const graceAfterAbort = raceExecuteWithGraceTimeout(executePromise, signal, toolName);
+
+  // Race: the hard timeout, the grace timeout, or the actual execution
+  try {
+    return await Promise.race([
+      graceAfterAbort,
+      toolHardTimeout,
+    ]);
+  } finally {
+    // Cleanup is handled by raceExecuteWithGraceTimeout's finally block
+  }
 }
 
 async function raceExecuteWithGraceTimeout(

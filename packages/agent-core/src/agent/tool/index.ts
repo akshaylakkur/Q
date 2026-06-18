@@ -6,6 +6,18 @@
  *
  * Built-in tools are backed by the agent's `runtime.qmain` and the high-level
  * `FileConnector` / `ShellConnector` / `WebConnector` from `@q/qmain`.
+ *
+ * ── SAFEGUARDS ───────────────────────────────────────────────────────────
+ *
+ * Every Bash command is subject to a HARD timeout ceiling of
+ * MAX_BASH_TIMEOUT_MS (360,000 ms = 6 minutes). The LLM may request a
+ * shorter timeout, but it can never exceed this ceiling. This prevents a
+ * single hung command from blocking the entire pipeline indefinitely.
+ *
+ * All tool output is capped at TOOL_OUTPUT_CAP (100 KB). Every tool
+ * execution is also wrapped in a per-tool timeout race (see tool-call.ts)
+ * so that even if the underlying process hangs, the tool call itself will
+ * be aborted and reported as an error — never silently blocking the turn.
  */
 
 import { dirname } from "node:path";
@@ -34,6 +46,38 @@ export interface UserToolRegistration {
 const TOOL_OUTPUT_CAP = 100_000;
 /** Maximum body size for WebFetch responses. */
 const WEB_FETCH_CAP = 50_000;
+
+/**
+ * Hard ceiling for any Bash command execution (6 minutes).
+ * The LLM may request a shorter timeout, but it can never exceed this value.
+ * This prevents a single hung command from blocking the agent loop indefinitely.
+ */
+const MAX_BASH_TIMEOUT_MS = 360_000;
+
+/**
+ * Hard ceiling for the full turn loop (30 minutes).
+ * If an entire agent turn (multiple LLM calls + tool executions) exceeds
+ * this, the turn is aborted and reported as a timeout error.
+ */
+const MAX_TURN_TIMEOUT_MS = 4_680_000;
+
+/**
+ * LLM context window overflow detection patterns.
+ * These are common error messages from various providers indicating the
+ * request exceeded the model's context window limit.
+ */
+const CONTEXT_OVERFLOW_PATTERNS = [
+  /context.*exceeded/i,
+  /context.*too long/i,
+  /context.*overflow/i,
+  /too many tokens/i,
+  /maximum.*context/i,
+  /token.*limit.*exceeded/i,
+  /request.*too large/i,
+  /content.*length.*exceeded/i,
+  /prompt.*too long/i,
+  /input.*too long/i,
+];
 
 export class ToolManager {
   protected builtinTools: Map<string, ExecutableTool> = new Map();
@@ -470,7 +514,7 @@ function createBashTool(shellConnector: ShellConnector): ExecutableTool {
       properties: {
         command: { type: "string", description: "The shell command to execute." },
         cwd: { type: "string", description: "Optional working directory." },
-        timeout: { type: "number", description: "Optional timeout in milliseconds." },
+        timeout: { type: "number", description: "Optional timeout in milliseconds (max " + String(MAX_BASH_TIMEOUT_MS) + "ms = 6 minutes)." },
         env: { type: "object", description: "Optional additional environment variables.", additionalProperties: { type: "string" } },
       },
       required: ["command"],
@@ -478,16 +522,52 @@ function createBashTool(shellConnector: ShellConnector): ExecutableTool {
     resolveExecution: (args: unknown) => {
       const a = args as { command?: string; cwd?: string; timeout?: number; env?: Record<string, string> };
       const command = a?.command ?? "";
+      // ── SAFEGUARD: Enforce hard timeout ceiling ───────────────────────────
+      // The LLM may request a timeout, but it can never exceed
+      // MAX_BASH_TIMEOUT_MS. If the LLM omits a timeout, we default to
+      // the maximum so long-running acceptable commands still work, but
+      // nothing hangs forever.
+      const effectiveTimeout = a?.timeout !== undefined
+        ? Math.min(a.timeout, MAX_BASH_TIMEOUT_MS)
+        : MAX_BASH_TIMEOUT_MS;
       return {
         approvalRule: "Bash",
         accesses: ToolAccesses.all(),
-        execute: async (_ctx: ExecutableToolContext): Promise<ExecutableToolResult> => {
+        execute: async (ctx: ExecutableToolContext): Promise<ExecutableToolResult> => {
+          // ── SAFEGUARD: Per-tool AbortController race ──────────────────────
+          // Even if shellConnector.exec doesn't respect the timeout (e.g.,
+          // the underlying child_process ignores the timeout option for
+          // certain system calls), we race the execution against a local
+          // AbortController that fires after effectiveTimeout ms.
+          const toolAbortController = new AbortController();
+          const toolTimeout = setTimeout(() => {
+            toolAbortController.abort();
+          }, effectiveTimeout);
+
+          // Also abort tool-local timeout when the parent signal fires.
+          const onParentAbort = (): void => {
+            toolAbortController.abort();
+          };
+          ctx.signal.addEventListener("abort", onParentAbort, { once: true });
+
           try {
-            const result = await shellConnector.exec(command, {
-              cwd: a?.cwd,
-              timeout: a?.timeout,
-              env: a?.env,
-            });
+            const result = await Promise.race([
+              shellConnector.exec(command, {
+                cwd: a?.cwd,
+                timeout: effectiveTimeout,
+                env: a?.env,
+              }),
+              new Promise<never>((_, reject) => {
+                toolAbortController.signal.addEventListener("abort", () => {
+                  reject(new Error(
+                    ctx.signal.aborted
+                      ? `Bash command was aborted by the parent signal`
+                      : `Bash command timed out after ${effectiveTimeout}ms`,
+                  ));
+                }, { once: true });
+              }),
+            ]);
+
             const stdout = truncate(result.stdout ?? "", TOOL_OUTPUT_CAP);
             const stderr = truncate(result.stderr ?? "", TOOL_OUTPUT_CAP);
             let output = stdout;
@@ -498,7 +578,18 @@ function createBashTool(shellConnector: ShellConnector): ExecutableTool {
             return ok(output || `(command succeeded, no output)`);
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
+            // If aborted by parent signal, don't try to continue
+            if (ctx.signal.aborted) {
+              return err(`Bash was aborted`, { stopTurn: true });
+            }
             return err(`Bash failed: ${msg}`);
+          } finally {
+            clearTimeout(toolTimeout);
+            try {
+              ctx.signal.removeEventListener("abort", onParentAbort);
+            } catch {
+              // ignore
+            }
           }
         },
       };

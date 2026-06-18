@@ -12,7 +12,8 @@ import { readdirSync, statSync, readFileSync, existsSync, writeFileSync, mkdirSy
 import { resolve, relative, dirname, join } from "node:path";
 import { createReadStream } from "node:fs";
 import type { FileManifest, FileManifestEntry } from "@qode-agent/protocol";
-import ignore from "ignore";
+import _ignore from "ignore";
+const ignore = _ignore.default ?? _ignore;
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 

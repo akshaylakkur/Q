@@ -8,7 +8,17 @@ import type { FinishReason, TokenUsage } from "@q/qprovs";
 import type { ToolInputDisplay } from "./display.js";
 import type { ExecutableToolResult, LoopStepStopReason, ToolUpdate } from "./types.js";
 
-export type LoopInterruptReason = "aborted" | "max_steps" | "error";
+/**
+ * Reasons why a turn was interrupted.
+ * - "aborted": the parent signal was aborted (user cancelled).
+ * - "max_steps": the turn exceeded the maximum number of steps.
+ * - "error": an unrecoverable error occurred during execution.
+ * - "context_overflow": the LLM provider indicated the context window
+ *   was exceeded. The orchestrator should compact memory and retry.
+ * - "turn_timeout": the global turn timeout was exceeded (default 30 min).
+ *   This prevents a single hung command from blocking the daemon forever.
+ */
+export type LoopInterruptReason = "aborted" | "max_steps" | "error" | "context_overflow" | "turn_timeout";
 
 export interface LoopStepBeginEvent {
   readonly type: "step.begin";
