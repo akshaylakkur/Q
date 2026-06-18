@@ -9,11 +9,24 @@
 #  Publish order (dependency chain):
 #    1. @qode-agent/protocol  (NEW)     — shared wire protocol types
 #    2. @qode-agent/runtime   (NEW)     — extracted runtime core
-#    3. @qode-agent/cli       (UPDATE)  — CLI with QSSH + runtime deps
+#    3. @qode-agent/cli       (0.1.0→0.2.0) — CLI with QSSH + runtime + protocol deps
 #    4. @qode-agent/q-remote  (NEW)     — headless remote daemon
-#    5. qode-agent            (UPDATE)  — umbrella package
+#    5. qode-agent            (0.1.3→0.2.0) — umbrella package
 #
-#  Platform binaries (darwin-arm64, darwin-x64, win32-x64) unchanged.
+#  Publish chain at npm install time:
+#    npm install -g qode-agent
+#      → qode-agent@0.2.0
+#        → @qode-agent/cli@0.2.0
+#          → @qode-agent/runtime@0.1.0
+#            → @qode-agent/agent-core@0.1.0  (already published)
+#            → @qode-agent/qprovs@0.1.0       (already published)
+#            → @qode-agent/qmain@0.1.0        (already published)
+#            → @qode-agent/telemetry@0.1.0    (already published)
+#            → @qode-agent/oauth@0.1.0        (already published)
+#          → @qode-agent/protocol@0.1.0
+#          → @qode-agent/agent-core@0.1.0
+#          → @qode-agent/qprovs@0.1.0
+#          → @qode-agent/qmain@0.1.0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 set -euo pipefail
@@ -22,7 +35,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  QSSH npm Release — Build & Publish Prep"
+echo "  QSSH npm Release v0.2.0 — Build & Publish Prep"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -46,15 +59,13 @@ echo ""
 
 # ── Step 3: Strip workspace:* deps for publish ────────────────────────────
 echo "[3/5] Stripping workspace:* deps from package.json files..."
-
-# For packages that are published to npm, we need to replace workspace:*
-# with actual version numbers. The dist files bundle everything, but
-# npm needs valid semver ranges in the published package.json.
+echo ""
 
 # @qode-agent/protocol — no workspace deps, no changes needed
 echo "  ✓ @qode-agent/protocol — no workspace deps"
 
-# @qode-agent/runtime — replace workspace:* with published versions
+# @qode-agent/runtime — its workspace:* deps (agent-core, qprovs, qmain,
+#   telemetry, oauth) are all already published at 0.1.0
 node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('packages/runtime/package.json', 'utf-8'));
@@ -66,7 +77,8 @@ fs.writeFileSync('packages/runtime/package.json', JSON.stringify(pkg, null, 2) +
 console.log('  ✓ @qode-agent/runtime — workspace:* replaced with 0.1.0');
 "
 
-# @qode-agent/cli — replace workspace:* with published versions
+# @qode-agent/cli@0.2.0 — runtime and protocol are NEW (0.1.0),
+#   agent-core, qprovs, qmain are already published (0.1.0)
 node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('apps/q-cli/package.json', 'utf-8'));
@@ -78,7 +90,8 @@ fs.writeFileSync('apps/q-cli/package.json', JSON.stringify(pkg, null, 2) + '\n')
 console.log('  ✓ @qode-agent/cli — workspace:* replaced with 0.1.0');
 "
 
-# @qode-agent/q-remote — replace workspace:* with published versions
+# @qode-agent/q-remote — all workspace deps are either already published
+#   or being published as 0.1.0 in this release
 node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('packages/q-remote/package.json', 'utf-8'));
@@ -100,30 +113,36 @@ echo "  PUBLISH COMMANDS"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-echo "  # 1. Publish @qode-agent/protocol (NEW)"
-echo "  cd $ROOT/packages/protocol"
-echo "  npm publish --access public"
-echo ""
+cat <<PUBLISH
 
-echo "  # 2. Publish @qode-agent/runtime (NEW)"
-echo "  cd $ROOT/packages/runtime"
-echo "  npm publish --access public"
-echo ""
+  # ── 1. Publish @qode-agent/protocol (FIRST TIME) ──
+  cd $ROOT/packages/protocol
+  npm publish --access public
 
-echo "  # 3. Publish @qode-agent/cli (UPDATE)"
-echo "  cd $ROOT/apps/q-cli"
-echo "  npm publish --access public"
-echo ""
+  # ── 2. Publish @qode-agent/runtime (FIRST TIME) ──
+  #     Depends on: agent-core@0.1.0, qprovs@0.1.0, qmain@0.1.0,
+  #                 telemetry@0.1.0, oauth@0.1.0
+  cd $ROOT/packages/runtime
+  npm publish --access public
 
-echo "  # 4. Publish @qode-agent/q-remote (NEW)"
-echo "  cd $ROOT/packages/q-remote"
-echo "  npm publish --access public"
-echo ""
+  # ── 3. Publish @qode-agent/cli (UPDATE 0.2.0) ──
+  #     Depends on: runtime@0.1.0, protocol@0.1.0,
+  #                 agent-core@0.1.0, qprovs@0.1.0, qmain@0.1.0
+  cd $ROOT/apps/q-cli
+  npm publish --access public
 
-echo "  # 5. Publish qode-agent umbrella (UPDATE)"
-echo "  cd $ROOT/npm/qode"
-echo "  npm publish --access public"
-echo ""
+  # ── 4. Publish @qode-agent/q-remote (FIRST TIME) ──
+  #     Depends on: runtime@0.1.0, protocol@0.1.0,
+  #                 agent-core@0.1.0, qprovs@0.1.0, qmain@0.1.0
+  cd $ROOT/packages/q-remote
+  npm publish --access public
+
+  # ── 5. Publish qode-agent umbrella (UPDATE 0.2.0) ──
+  #     Depends on: @qode-agent/cli@0.2.0
+  cd $ROOT/npm/qode
+  npm publish --access public
+
+PUBLISH
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -131,14 +150,17 @@ echo ""
 # ── Step 5: Restore workspace:* deps ──────────────────────────────────────
 echo "[5/5] Restoring workspace:* deps..."
 git checkout -- packages/runtime/package.json apps/q-cli/package.json packages/q-remote/package.json
-echo "  ✓ package.json files restored"
+echo "  ✓ package.json files restored to workspace:*"
 echo ""
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  All set. Run the publish commands above in order."
-echo "  After publishing, tag the release:"
+echo "  All set. After publishing, tag and push:"
 echo ""
 echo "    git tag v0.2.0"
-echo "    git push --tags"
+echo "    git push origin main --tags"
+echo ""
+echo "  Verify with: npm view qode-agent"
+echo "  Then install: npm install -g qode-agent"
+echo "  And run: q --version"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
