@@ -30,8 +30,9 @@
 
 // `process` is a global in Node.js — no import needed.
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import { writeSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { RemoteDaemon } from "./daemon.js";
 import { SyncServer } from "./sync-server.js";
@@ -42,7 +43,19 @@ import { EventBridge } from "./event-bridge.js";
 import { LogStore } from "./log-store.js";
 import { serializeEnvelope } from "@qode-agent/protocol";
 
-const VERSION = "0.1.0";
+// Read version from package.json at runtime
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+let VERSION = "0.0.0-dev";
+try {
+  const pkgPath = resolve(__dirname, "..", "package.json");
+  if (existsSync(pkgPath)) {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    VERSION = pkg.version ?? VERSION;
+  }
+} catch {
+  // Fallback to dev version
+}
 
 // ─── Arg parsing ──────────────────────────────────────────────────────────────
 

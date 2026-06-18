@@ -46,17 +46,22 @@ export function registerSshCommand(prog: Command): void {
     .option("--mode <mode>", "Execution mode (auto|modus_maximus)", "auto")
     .option("--yolo", "Auto-approve all actions on the remote (default for cloud)")
     .option("--session <id>", "Session ID (auto-generated if omitted)")
-    .option("--force-rebuild", "Force rebuild the q-remote tarball")
+    .option("--tarball", "Use local tarball instead of npm registry (for development)")
+    .option("--force-rebuild", "Force rebuild the q-remote tarball (only with --tarball)")
+    .option("--version <version>", "npm package version to install (e.g. 0.2.9)")
     .action(async (host: string, opts: {
       user?: string; port?: string; key?: string;
-      mode?: string; yolo?: boolean; session?: string; forceRebuild?: boolean;
+      mode?: string; yolo?: boolean; session?: string;
+      tarball?: boolean; forceRebuild?: boolean; version?: string;
     }) => {
       await sshConnect(parseTarget(host, opts), {
         workDir: process.cwd(),
         mode: opts.mode,
         yolo: opts.yolo,
         session: opts.session,
+        tarball: opts.tarball,
         forceRebuild: opts.forceRebuild,
+        version: opts.version,
       }).catch((err) => {
         console.error(`SSH connect error: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);

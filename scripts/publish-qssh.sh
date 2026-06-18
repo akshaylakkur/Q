@@ -7,26 +7,19 @@
 #  to run manually.
 #
 #  Publish order (dependency chain):
-#    1. @qode-agent/protocol  (NEW)     — shared wire protocol types
-#    2. @qode-agent/runtime   (NEW)     — extracted runtime core
-#    3. @qode-agent/cli       (0.1.0→0.2.0) — CLI with QSSH + runtime + protocol deps
-#    4. @qode-agent/q-remote  (NEW)     — headless remote daemon
-#    5. qode-agent            (0.1.3→0.2.0) — umbrella package
+#    1. @qode-agent/protocol  — shared wire protocol types (no deps)
+#    2. @qode-agent/qprovs    — LLM provider abstraction (no @qode-agent deps)
+#    3. @qode-agent/qmain     — main process interface (no @qode-agent deps)
+#    4. @qode-agent/telemetry — telemetry (no @qode-agent deps)
+#    5. @qode-agent/oauth     — OAuth 2.0 support (no @qode-agent deps)
+#    6. @qode-agent/agent-core — core agent engine (depends on qprovs, qmain, telemetry)
+#    7. @qode-agent/runtime   — app-level runtime (depends on agent-core, qprovs, qmain, telemetry, oauth)
+#    8. @qode-agent/cli       — CLI (depends on runtime, protocol, agent-core, qprovs, qmain)
+#    9. @qode-agent/q-remote  — headless remote daemon (depends on runtime, agent-core, qprovs, qmain, protocol)
+#   10. qode-agent            — umbrella package (depends on @qode-agent/cli)
 #
-#  Publish chain at npm install time:
-#    npm install -g qode-agent
-#      → qode-agent@0.2.0
-#        → @qode-agent/cli@0.2.0
-#          → @qode-agent/runtime@0.1.0
-#            → @qode-agent/agent-core@0.1.0  (already published)
-#            → @qode-agent/qprovs@0.1.0       (already published)
-#            → @qode-agent/qmain@0.1.0        (already published)
-#            → @qode-agent/telemetry@0.1.0    (already published)
-#            → @qode-agent/oauth@0.1.0        (already published)
-#          → @qode-agent/protocol@0.1.0
-#          → @qode-agent/agent-core@0.1.0
-#          → @qode-agent/qprovs@0.1.0
-#          → @qode-agent/qmain@0.1.0
+#  IMPORTANT: All packages must be published with the SAME version number.
+#  The current version is read from packages/q-remote/package.json.
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 set -euo pipefail
@@ -34,20 +27,23 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Read the current version from q-remote (all packages should match)
+VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('packages/q-remote/package.json','utf-8')).version)")
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  QSSH npm Release v0.2.0 — Build & Publish Prep"
+echo "  QSSH npm Release v${VERSION} — Build & Publish Prep"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 # ── Step 1: Build everything ──────────────────────────────────────────────
-echo "[1/5] Building all packages..."
+echo "[1/4] Building all packages..."
 pnpm build:all
 echo "  ✓ Build complete"
 echo ""
 
 # ── Step 2: Verify dist files exist ───────────────────────────────────────
-echo "[2/5] Verifying dist files..."
-for pkg in packages/protocol packages/runtime apps/q-cli packages/q-remote; do
+echo "[2/4] Verifying dist files..."
+for pkg in packages/protocol packages/qprovs packages/qmain packages/telemetry packages/oauth packages/agent-core packages/runtime apps/q-cli packages/q-remote; do
   if [ -d "$pkg/dist" ] && [ "$(ls -A "$pkg/dist" 2>/dev/null)" ]; then
     echo "  ✓ $pkg/dist/ has files"
   else
@@ -57,88 +53,79 @@ for pkg in packages/protocol packages/runtime apps/q-cli packages/q-remote; do
 done
 echo ""
 
-# ── Step 3: Strip workspace:* deps for publish ────────────────────────────
-echo "[3/5] Stripping workspace:* deps from package.json files..."
-echo ""
-
-# @qode-agent/protocol — no workspace deps, no changes needed
-echo "  ✓ @qode-agent/protocol — no workspace deps"
-
-# @qode-agent/runtime — its workspace:* deps (agent-core, qprovs, qmain,
-#   telemetry, oauth) are all already published at 0.1.0
-node -e "
-const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('packages/runtime/package.json', 'utf-8'));
-const deps = pkg.dependencies || {};
-for (const [k, v] of Object.entries(deps)) {
-  if (v === 'workspace:*') deps[k] = '0.1.0';
-}
-fs.writeFileSync('packages/runtime/package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log('  ✓ @qode-agent/runtime — workspace:* replaced with 0.1.0');
-"
-
-# @qode-agent/cli@0.2.0 — runtime and protocol are NEW (0.1.0),
-#   agent-core, qprovs, qmain are already published (0.1.0)
-node -e "
-const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('apps/q-cli/package.json', 'utf-8'));
-const deps = pkg.dependencies || {};
-for (const [k, v] of Object.entries(deps)) {
-  if (v === 'workspace:*') deps[k] = '0.1.0';
-}
-fs.writeFileSync('apps/q-cli/package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log('  ✓ @qode-agent/cli — workspace:* replaced with 0.1.0');
-"
-
-# @qode-agent/q-remote — all workspace deps are either already published
-#   or being published as 0.1.0 in this release
-node -e "
-const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('packages/q-remote/package.json', 'utf-8'));
-const deps = pkg.dependencies || {};
-for (const [k, v] of Object.entries(deps)) {
-  if (v === 'workspace:*') deps[k] = '0.1.0';
-}
-fs.writeFileSync('packages/q-remote/package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log('  ✓ @qode-agent/q-remote — workspace:* replaced with 0.1.0');
-"
-
+# ── Step 3: Verify all versions match ─────────────────────────────────────
+echo "[3/4] Verifying all package versions match ${VERSION}..."
+MISMATCH=0
+for pkg in packages/protocol packages/qprovs packages/qmain packages/telemetry packages/oauth packages/agent-core packages/runtime apps/q-cli packages/q-remote packages/node-sdk npm/qode; do
+  PKG_VER=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$pkg/package.json','utf-8')).version)")
+  if [ "$PKG_VER" != "$VERSION" ]; then
+    echo "  ✗ $pkg version $PKG_VER does not match $VERSION"
+    MISMATCH=1
+  fi
+done
+if [ "$MISMATCH" -eq 1 ]; then
+  echo ""
+  echo "  Version mismatch detected. Fix before publishing."
+  exit 1
+fi
+echo "  ✓ All packages at v${VERSION}"
 echo ""
 
 # ── Step 4: Print publish commands ───────────────────────────────────────
-echo "[4/5] Publish commands (run these manually in order):"
+echo "[4/4] Publish commands (run these manually in order):"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  PUBLISH COMMANDS"
+echo "  PUBLISH COMMANDS (v${VERSION})"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 cat <<PUBLISH
 
-  # ── 1. Publish @qode-agent/protocol (FIRST TIME) ──
+  # ── 1. Publish @qode-agent/protocol (no deps) ──
   cd $ROOT/packages/protocol
   npm publish --access public
 
-  # ── 2. Publish @qode-agent/runtime (FIRST TIME) ──
-  #     Depends on: agent-core@0.1.0, qprovs@0.1.0, qmain@0.1.0,
-  #                 telemetry@0.1.0, oauth@0.1.0
+  # ── 2. Publish @qode-agent/qprovs (no @qode-agent deps) ──
+  cd $ROOT/packages/qprovs
+  npm publish --access public
+
+  # ── 3. Publish @qode-agent/qmain (no @qode-agent deps) ──
+  cd $ROOT/packages/qmain
+  npm publish --access public
+
+  # ── 4. Publish @qode-agent/telemetry (no @qode-agent deps) ──
+  cd $ROOT/packages/telemetry
+  npm publish --access public
+
+  # ── 5. Publish @qode-agent/oauth (no @qode-agent deps) ──
+  cd $ROOT/packages/oauth
+  npm publish --access public
+
+  # ── 6. Publish @qode-agent/agent-core ──
+  #     Depends on: qprovs@${VERSION}, qmain@${VERSION}, telemetry@${VERSION}
+  cd $ROOT/packages/agent-core
+  npm publish --access public
+
+  # ── 7. Publish @qode-agent/runtime ──
+  #     Depends on: agent-core@${VERSION}, qprovs@${VERSION}, qmain@${VERSION},
+  #                 telemetry@${VERSION}, oauth@${VERSION}
   cd $ROOT/packages/runtime
   npm publish --access public
 
-  # ── 3. Publish @qode-agent/cli (UPDATE 0.2.0) ──
-  #     Depends on: runtime@0.1.0, protocol@0.1.0,
-  #                 agent-core@0.1.0, qprovs@0.1.0, qmain@0.1.0
+  # ── 8. Publish @qode-agent/cli ──
+  #     Depends on: runtime@${VERSION}, protocol@${VERSION},
+  #                 agent-core@${VERSION}, qprovs@${VERSION}, qmain@${VERSION}
   cd $ROOT/apps/q-cli
   npm publish --access public
 
-  # ── 4. Publish @qode-agent/q-remote (FIRST TIME) ──
-  #     Depends on: runtime@0.1.0, protocol@0.1.0,
-  #                 agent-core@0.1.0, qprovs@0.1.0, qmain@0.1.0
+  # ── 9. Publish @qode-agent/q-remote ──
+  #     Depends on: runtime@${VERSION}, agent-core@${VERSION},
+  #                 qprovs@${VERSION}, qmain@${VERSION}, protocol@${VERSION}
   cd $ROOT/packages/q-remote
   npm publish --access public
 
-  # ── 5. Publish qode-agent umbrella (UPDATE 0.2.0) ──
-  #     Depends on: @qode-agent/cli@0.2.0
+  # ── 10. Publish qode-agent umbrella ──
+  #      Depends on: @qode-agent/cli@${VERSION}
   cd $ROOT/npm/qode
   npm publish --access public
 
@@ -146,17 +133,9 @@ PUBLISH
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-
-# ── Step 5: Restore workspace:* deps ──────────────────────────────────────
-echo "[5/5] Restoring workspace:* deps..."
-git checkout -- packages/runtime/package.json apps/q-cli/package.json packages/q-remote/package.json
-echo "  ✓ package.json files restored to workspace:*"
+echo "  After publishing, tag and push:"
 echo ""
-
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  All set. After publishing, tag and push:"
-echo ""
-echo "    git tag v0.2.0"
+echo "    git tag v${VERSION}"
 echo "    git push origin main --tags"
 echo ""
 echo "  Verify with: npm view qode-agent"

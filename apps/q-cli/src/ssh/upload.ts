@@ -152,7 +152,6 @@ export function computeLocalManifest(
 // ─── Internal ──────────────────────────────────────────────────────────────────
 
 function walkDir(root: string, relDir: string, ig: ignore.Ignore, files: string[]): void {
-  const { readdirSync, statSync } = require("node:fs");
   const absDir = resolve(root, relDir);
   let items: string[];
   try {

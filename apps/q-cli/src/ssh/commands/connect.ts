@@ -1,9 +1,12 @@
 /**
  * `q-cli ssh connect <host>` — the full connect flow.
  *
- * Orchestrates: validate SSH → check Node → build+upload q-remote →
+ * Orchestrates: validate SSH → check Node → install q-remote from npm →
  * collect+encrypt creds → upload creds → upload project snapshot →
  * launch remote daemon (nohup) → transition to remote-streaming TUI.
+ *
+ * In production, q-remote is installed from the npm registry. For local
+ * development, use --tarball to build and upload from source.
  *
  * Each step shows text-based progress (no icons, per project rules).
  */
@@ -17,7 +20,7 @@ import { RemoteSession } from "../remote-session.js";
 import { StepProgress } from "../progress.js";
 import type { SshTarget } from "../types.js";
 import type { RemoteSessionInfo } from "@qode-agent/protocol";
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { writeSync } from "node:fs";
@@ -29,8 +32,12 @@ export interface ConnectOptions {
   mode?: string;
   yolo?: boolean;
   session?: string;
-  /** Force rebuild the q-remote tarball. */
+  /** Use tarball-based install instead of npm registry (for development). */
+  tarball?: boolean;
+  /** Force rebuild the q-remote tarball (only with --tarball). */
   forceRebuild?: boolean;
+  /** npm package version to install (e.g. "0.2.9"). Default reads from local package.json. */
+  version?: string;
 }
 
 export async function sshConnect(
@@ -52,19 +59,35 @@ export async function sshConnect(
   steps.done();
 
   // ── Step 2: Check remote Node + install q-remote ──────────────────────────
-  steps.start("Building q-remote package");
-  const tarballPath = ensureQRemoteTarball({ force: opts.forceRebuild });
-  steps.done();
+  if (opts.tarball) {
+    steps.start("Building q-remote package");
+    const tarballPath = ensureQRemoteTarball({ force: opts.forceRebuild });
+    steps.done();
 
-  steps.start("Installing remote agent");
-  let remoteReady;
-  try {
-    remoteReady = await ensureRemoteReady(transport, { qRemoteTarballPath: tarballPath });
-  } catch (err) {
-    steps.fail(err instanceof Error ? err.message : String(err));
-    process.exit(1);
+    steps.start("Installing remote agent from tarball");
+    let remoteReady;
+    try {
+      remoteReady = await ensureRemoteReady(transport, {
+        method: { type: "tarball", opts: { qRemoteTarballPath: tarballPath } },
+      });
+    } catch (err) {
+      steps.fail(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+    steps.done(remoteReady.skipped ? "(already installed)" : `v${remoteReady.version}`);
+  } else {
+    steps.start("Installing remote agent from npm");
+    let remoteReady;
+    try {
+      remoteReady = await ensureRemoteReady(transport, {
+        method: { type: "npm", opts: { version: opts.version } },
+      });
+    } catch (err) {
+      steps.fail(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+    steps.done(remoteReady.skipped ? "(already installed)" : `v${remoteReady.version}`);
   }
-  steps.done(remoteReady.skipped ? "(already installed)" : `v${remoteReady.version}`);
 
   // ── Step 3: Collect + encrypt credentials ────────────────────────────────
   steps.start("Securing credentials");
@@ -105,7 +128,7 @@ export async function sshConnect(
     steps.fail(err instanceof Error ? err.message : String(err));
     process.exit(1);
   } finally {
-    try { require("node:fs").unlinkSync(tmpCredsLocal); } catch { /* */ }
+    try { unlinkSync(tmpCredsLocal); } catch { /* */ }
   }
 }
 
@@ -139,7 +162,7 @@ async function launchDaemonAndAttach(
     await transport.exec(`mkdir -p '${remoteWorkspace}'`);
     await uploadProjectSnapshot(transport, tarballPath, remoteWorkspace);
     // Cleanup local tarball
-    try { require("node:fs").unlinkSync(tarballPath); } catch { /* */ }
+    try { unlinkSync(tarballPath); } catch { /* */ }
   } catch (err) {
     steps.fail(err instanceof Error ? err.message : String(err));
     process.exit(1);

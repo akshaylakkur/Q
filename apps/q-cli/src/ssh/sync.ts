@@ -15,7 +15,7 @@
 import { SshTransport } from "./transport.js";
 import { createProjectSnapshot, uploadProjectSnapshot, computeLocalManifest } from "./upload.js";
 import { parseEnvelope, type FileManifestEntry, type SyncDirection, type ConflictPolicy, type SyncReport } from "@qode-agent/protocol";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -115,7 +115,7 @@ export async function biDirectionalSync(
         }
         // Cleanup
         await transport.exec(`rm -f '${remoteTarball}'`).catch(() => {});
-        try { require("node:fs").unlinkSync(tarballPath); } catch { /* */ }
+        try { unlinkSync(tarballPath); } catch { /* */ }
       } catch (err) {
         errors.push(`Push failed: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -205,7 +205,7 @@ async function createPatchTarball(localWorkDir: string, entries: FileManifestEnt
     let stderr = "";
     child.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
     child.on("close", (code) => {
-      try { require("node:fs").unlinkSync(listPath); } catch { /* */ }
+      try { unlinkSync(listPath); } catch { /* */ }
       if (code === 0) resolvePromise(tarballPath);
       else reject(new Error(`tar patch failed: ${stderr}`));
     });
@@ -230,7 +230,7 @@ async function pullFiles(transport: SshTransport, remoteWorkspace: string, local
   try {
     execSync(`tar xzf '${localTarball}' -C '${localWorkDir}'`, { timeout: 60_000 });
   } finally {
-    try { require("node:fs").unlinkSync(localTarball); } catch { /* */ }
+    try { unlinkSync(localTarball); } catch { /* */ }
     await transport.exec(`rm -f '${remoteTarball}' '${listPath}'`).catch(() => {});
   }
   return entries.length;
@@ -278,7 +278,7 @@ function resolveConflict(
         writeFileSync(localPath, merged, "utf-8");
         // Upload the merged version back
         transport.uploadFile(localPath, remotePath).catch(() => {});
-        try { require("node:fs").unlinkSync(tmpRemote); } catch { /* */ }
+        try { unlinkSync(tmpRemote); } catch { /* */ }
       } catch {
         // Merge failed — fall back to remote-wins
         transport.downloadFile(remotePath, localPath).catch(() => {});

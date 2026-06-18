@@ -178,6 +178,20 @@ export class RemoteDaemon {
     // ── SAFEGUARD: Start the watchdog timer ──────────────────────────────
     this.startWatchdog();
 
+    // Emit metadata event with instance info
+    this.eventBridge.emitMetadata({
+      host: hostname(),
+      user: (() => { try { return userInfo().username; } catch { return undefined; } })(),
+      sessionId: this.opts.sessionId,
+      workspace: this.opts.workspace,
+      nodeVersion: process.version,
+      arch: process.arch,
+      platform: process.platform,
+      pid: process.pid,
+      startedAt: new Date(this.startedAt).toISOString(),
+      mode: this.currentMode,
+    });
+
     // Mark running
     this.running = true;
     this.sessionManager.updateStatus(this.opts.sessionId, "running");

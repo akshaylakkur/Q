@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/telemetry",
-  "version": "0.2.2",
+  "version": "0.2.10",
   "description": "Qode — Shared telemetry and analytics infrastructure",
   "type": "module",
   "main": "./dist/index.mjs",
@@ -15,7 +15,8 @@
     "access": "public"
   },
   "files": [
-    "dist/"
+    "dist/",
+    "README.md"
   ],
   "scripts": {
     "build": "tsdown",
