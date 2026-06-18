@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/qprovs",
-  "version": "0.2.11",
+  "version": "0.3.0",
   "description": "Qode — LLM provider abstraction layer (Anthropic, OpenAI, Google, Ollama, etc.)",
   "type": "module",
   "main": "./dist/index.mjs",

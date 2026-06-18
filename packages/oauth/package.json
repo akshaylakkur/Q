@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/oauth",
-  "version": "0.2.11",
+  "version": "0.3.0",
   "description": "Qode — OAuth authentication toolkit",
   "type": "module",
   "main": "./dist/index.mjs",
