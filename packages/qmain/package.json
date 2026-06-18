@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/qmain",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "description": "Qode — Execution environment abstraction (local, SSH, Docker)",
   "type": "module",
   "main": "./dist/index.mjs",
@@ -14,7 +14,9 @@
   "publishConfig": {
     "access": "public"
   },
-  "files": ["dist/"],
+  "files": [
+    "dist/"
+  ],
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",

@@ -5,6 +5,11 @@
  * The remote computes a {@link FileManifest} (path + size + mtime + sha256)
  * for the workspace, respecting `.gitignore` and a `.q-remote-ignore` file.
  * The local side compares manifests and decides what to pull/push.
+ *
+ * ── NOTE ─────────────────────────────────────────────────────────────────
+ * We use a simple inline ignore-matcher instead of the `ignore` npm package
+ * because the CJS/ESM interop breaks when bundled by tsdown/rolldown.
+ * The implementation is minimal but sufficient for our use case.
  */
 
 import { createHash } from "node:crypto";
@@ -12,8 +17,6 @@ import { readdirSync, statSync, readFileSync, existsSync, writeFileSync, mkdirSy
 import { resolve, relative, dirname, join } from "node:path";
 import { createReadStream } from "node:fs";
 import type { FileManifest, FileManifestEntry } from "@qode-agent/protocol";
-import _ignore from "ignore";
-const ignore = _ignore.default ?? _ignore;
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -24,6 +27,11 @@ const ALWAYS_IGNORE = [
   "dist-native/**",
   ".q/**",
   ".q-remote/**",
+  ".npm/**",
+  ".pnpm-store/**",
+  ".cache/**",
+  ".local/**",
+  ".config/**",
   "*.log",
   ".env",
   ".env.*",
@@ -33,8 +41,125 @@ const ALWAYS_IGNORE = [
   "__pycache__/**",
   "*.tsbuildinfo",
   "coverage/**",
-  ".pnpm-store/**",
+  "*.pyc",
+  "*.pyo",
+  "snap/**",
+  "go/**",
+  ".cargo/**",
+  "rustup/**",
+  ".rustup/**",
 ];
+
+// ─── Simple Ignore Matcher ─────────────────────────────────────────────────
+
+/**
+ * A minimal gitignore-style pattern matcher.
+ * Supports: *, **, ?, [chars], ! negation, # comments, leading /
+ * Does NOT support: [a-z] ranges, {a,b} alternation
+ */
+class IgnoreMatcher {
+  private rules: Array<{ pattern: string; negate: boolean; regex: RegExp }> = [];
+
+  add(patterns: string | string[]): void {
+    const list = Array.isArray(patterns) ? patterns : patterns.split("\n");
+    for (const line of list) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+
+      let pattern = trimmed;
+      let negate = false;
+
+      // Negation
+      if (pattern.startsWith("!")) {
+        negate = true;
+        pattern = pattern.slice(1);
+      }
+
+      // Track whether the pattern was anchored to root (leading /)
+      // In gitignore: only a leading / anchors to root.
+      // Patterns without leading / match at any depth in the tree.
+      const anchoredToRoot = pattern.startsWith("/");
+      if (anchoredToRoot) {
+        pattern = pattern.slice(1);
+      }
+
+      // Convert glob pattern to regex
+      const regex = this.globToRegex(pattern, anchoredToRoot);
+      this.rules.push({ pattern: trimmed, negate, regex });
+    }
+  }
+
+  ignores(path: string): boolean {
+    let ignored = false;
+    for (const rule of this.rules) {
+      if (rule.regex.test(path)) {
+        ignored = !rule.negate;
+      }
+    }
+    return ignored;
+  }
+
+  private globToRegex(pattern: string, anchoredToRoot: boolean): RegExp {
+    // In gitignore:
+    //   - Patterns with a leading / are anchored to the repo root
+    //   - Patterns WITHOUT a leading / match at ANY depth in the tree
+    //   - node_modules/** should match foo/bar/node_modules/baz too
+    // So if not anchoredToRoot, we prefix with (^|.*/) to match anywhere
+
+    let regexStr = anchoredToRoot ? "^" : "(^|.*/)";
+    let i = 0;
+
+    while (i < pattern.length) {
+      const ch = pattern[i];
+
+      if (ch === "*" && i + 1 < pattern.length && pattern[i + 1] === "*") {
+        // ** matches everything including path separators
+        if (i + 2 < pattern.length && pattern[i + 2] === "/") {
+          // **/ at start or after / means match any depth
+          regexStr += "(?:.+/)?";
+          i += 3;
+        } else if (i > 0 && pattern[i - 1] === "/") {
+          // /** at end means match everything inside
+          regexStr += ".+";
+          i += 2;
+        } else {
+          regexStr += ".*";
+          i += 2;
+        }
+      } else if (ch === "*") {
+        // * matches anything except /
+        regexStr += "[^/]*";
+        i++;
+      } else if (ch === "?") {
+        regexStr += "[^/]";
+        i++;
+      } else if (ch === ".") {
+        regexStr += "\\.";
+        i++;
+      } else if (ch === "[") {
+        // Character class - simplified, just match the bracket literally
+        const end = pattern.indexOf("]", i + 1);
+        if (end === -1) {
+          regexStr += "\\[";
+          i++;
+        } else {
+          regexStr += pattern.slice(i, end + 1);
+          i = end + 1;
+        }
+      } else {
+        // Escape special regex chars
+        if ("+(){}^$|\\".includes(ch)) {
+          regexStr += "\\";
+        }
+        regexStr += ch;
+        i++;
+      }
+    }
+
+    regexStr += "$";
+    return new RegExp(regexStr);
+  }
+}
 
 // ─── SyncServer ─────────────────────────────────────────────────────────────
 
@@ -50,7 +175,7 @@ export class SyncServer {
    * Respects .gitignore + .q-remote-ignore + built-in always-ignore list.
    */
   async computeManifest(): Promise<FileManifest> {
-    const ig = ignore();
+    const ig = new IgnoreMatcher();
     ig.add(ALWAYS_IGNORE);
 
     // Load .gitignore if present
@@ -141,7 +266,7 @@ export class SyncServer {
 
   // ─── Internal ──────────────────────────────────────────────────────────────
 
-  private walk(root: string, relDir: string, ig: ignore.Ignore, entries: FileManifestEntry[]): void {
+  private walk(root: string, relDir: string, ig: IgnoreMatcher, entries: FileManifestEntry[]): void {
     const absDir = resolve(root, relDir);
     let items: string[];
     try {

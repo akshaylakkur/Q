@@ -80,11 +80,30 @@ function parseArgs(argv: string[]): ParsedArgs {
 }
 
 function out(line: string): void {
-  writeSync(1, line.endsWith("\n") ? line : line + "\n");
+  const text = line.endsWith("\n") ? line : line + "\n";
+  try {
+    writeSync(1, text);
+  } catch (e: unknown) {
+    // EAGAIN: pipe buffer full — retry once after a short delay
+    if ((e as NodeJS.ErrnoException)?.code === "EAGAIN") {
+      setTimeout(() => {
+        try { writeSync(1, text); } catch { /* ignore */ }
+      }, 100);
+    }
+  }
 }
 
 function err(line: string): void {
-  writeSync(2, line.endsWith("\n") ? line : line + "\n");
+  const text = line.endsWith("\n") ? line : line + "\n";
+  try {
+    writeSync(2, text);
+  } catch (e: unknown) {
+    if ((e as NodeJS.ErrnoException)?.code === "EAGAIN") {
+      setTimeout(() => {
+        try { writeSync(2, text); } catch { /* ignore */ }
+      }, 100);
+    }
+  }
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
@@ -364,7 +383,11 @@ async function runSessions(flags: Record<string, string>): Promise<void> {
 
 // ─── Entry ─────────────────────────────────────────────────────────────────
 
-main().catch((err) => {
-  err(`Fatal error: ${err instanceof Error ? err.message : String(err)}`);
+main().catch((caught) => {
+  try {
+    err(`Fatal error: ${caught instanceof Error ? caught.message : String(caught)}`);
+  } catch {
+    // stderr pipe full — silently exit
+  }
   process.exit(1);
 });
