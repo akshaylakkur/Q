@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/agent-core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Qode — Core agent engine: agent loop, tool execution, sub-agents",
   "type": "module",
   "main": "./dist/index.mjs",
@@ -25,9 +25,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@qode-agent/qprovs": "0.3.0",
-    "@qode-agent/qmain": "0.3.0",
-    "@qode-agent/telemetry": "0.3.0",
+    "@qode-agent/qprovs": "0.3.1",
+    "@qode-agent/qmain": "0.3.1",
+    "@qode-agent/telemetry": "0.3.1",
     "pathe": "^2.0.0",
     "zod": "^4.3.0"
   },

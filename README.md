@@ -1,6 +1,6 @@
 # Qode (q-cli)
 
-Node SDK v0.1.0
+CLI v0.3.1
 
 MIT
 

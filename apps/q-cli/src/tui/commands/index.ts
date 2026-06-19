@@ -37,6 +37,7 @@ import {
   handleSnapshotRejectCommand,
   handleSnapshotDiffCommand,
   handleCollabStatusCommand,
+  handleCollabKeyCommand,
   handleCollabRekeyCommand,
 } from "./collab.js";
 
@@ -242,6 +243,9 @@ async function handleBuiltInSlashCommand(
       return;
     case "collab-status":
       handleCollabStatusCommand(host, args);
+      return;
+    case "collab-key":
+      handleCollabKeyCommand(host, args);
       return;
     case "collab-rekey":
       handleCollabRekeyCommand(host, args);

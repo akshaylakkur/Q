@@ -147,4 +147,6 @@ export interface SlashCommandHost {
   collabSnapshotPush?(): void;
   /** Show collab status */
   collabShowStatus?(): void;
+  /** Show the session key for sharing with attendees */
+  collabShowKey?(): void;
 }

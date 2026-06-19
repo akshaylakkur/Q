@@ -506,6 +506,15 @@ export const ALL_SLASH_COMMANDS = [
     usage: "/collab-status",
   },
   {
+    name: "collab-key",
+    aliases: ["show-key", "session-key"],
+    description: "Show the session key for sharing with attendees (useful after terminal resize)",
+    category: "collab" as CommandCategory,
+    priority: 52,
+    availability: "always" as const,
+    usage: "/collab-key",
+  },
+  {
     name: "collab-rekey",
     aliases: ["rekey"],
     description: "Generate a new session key and invalidate the old one (master only)",

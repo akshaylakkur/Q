@@ -39,23 +39,23 @@ importers:
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
       '@qode-agent/agent-core':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/protocol':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/qmain':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/qollab':
         specifier: workspace:*
         version: link:../../packages/qollab
       '@qode-agent/qprovs':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/runtime':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@xenova/transformers':
         specifier: ^2.17.2
         version: 2.17.2
@@ -142,14 +142,14 @@ importers:
   packages/agent-core:
     dependencies:
       '@qode-agent/qmain':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/qprovs':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/telemetry':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       pathe:
         specifier: ^2.0.0
         version: 2.0.3
@@ -216,20 +216,20 @@ importers:
   packages/q-remote:
     dependencies:
       '@qode-agent/agent-core':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/protocol':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/qmain':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/qprovs':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/runtime':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
@@ -334,23 +334,23 @@ importers:
   packages/runtime:
     dependencies:
       '@qode-agent/agent-core':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/oauth':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/qmain':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/qollab':
         specifier: workspace:*
         version: link:../qollab
       '@qode-agent/qprovs':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       '@qode-agent/telemetry':
-        specifier: 0.2.11
-        version: 0.2.11
+        specifier: 0.3.0
+        version: 0.3.0
       diff:
         specifier: ^9.0.0
         version: 9.0.0
@@ -766,6 +766,10 @@ packages:
     resolution: {integrity: sha512-xYXh2zCj79i9/cUEcUsPZJKUAkyROMNpZ8mzjv2GFvYOg2dqG/I6WOvmpa8ZKWrO62Kg/qhGPemvMUiN53lp3A==}
     engines: {node: '>=22.19.0'}
 
+  '@qode-agent/agent-core@0.3.0':
+    resolution: {integrity: sha512-MGcYVSUosne8QhoTfz+A0bh9b1V4oS+HFHjptA1xygfSyxac4t3SzztW7t6kkoBSDOlv6uynh4WVXCsf/meoew==}
+    engines: {node: '>=22.19.0'}
+
   '@qode-agent/cli@0.2.11':
     resolution: {integrity: sha512-nLYnRfzWDVkk40YOeXDCei4ZcV3qH6cE48v9bjIbNJIT6a1PeTEEBen/3TQqUVYfzF8dMN6lmVTpnE9UqcVKPQ==}
     engines: {node: '>=22.19.0'}
@@ -775,24 +779,51 @@ packages:
     resolution: {integrity: sha512-Vz1rGptspsH6Hb0YSJb1jkZVUDZD74itMJk35dK37upFE1piWCxtrEFbHnv5jDebQz/wPBJM0y45ajNZEFLReg==}
     engines: {node: '>=22.19.0'}
 
+  '@qode-agent/oauth@0.3.0':
+    resolution: {integrity: sha512-rpfA4X7PQgU8kxqYdDAN9CsDi0VEmtfo3UF7/LfIxB2HNi9+ipf4Nr6uba0zJzz+s+ru8TW3gVX+ze7f+Nbgdw==}
+    engines: {node: '>=22.19.0'}
+
   '@qode-agent/protocol@0.2.11':
     resolution: {integrity: sha512-wIE3lRzAChdYdvm2PirjvzjKBAz8xUnaV18xTkjhalQVO1Dx8bxJ7D798TpNHPefv8yBg2N3gQIf9Dr5ZgWzNQ==}
+    engines: {node: '>=22.19.0'}
+
+  '@qode-agent/protocol@0.3.0':
+    resolution: {integrity: sha512-NXPGDR+ojAJne4q5WRDP+rPwktwe0B7VrgELVDi84VPB9mdkV0qS24uLmlOBnmD+suz+BLPHOl+j1Tl2EdAsrw==}
     engines: {node: '>=22.19.0'}
 
   '@qode-agent/qmain@0.2.11':
     resolution: {integrity: sha512-i/MzgspEIwhLRHiyVwask50JzjHKegBUMBhgLaShwyZoQ+ez00yNuFRhAMGHFr+bV1IezswMMruVx2b+RIoIMw==}
     engines: {node: '>=22.19.0'}
 
+  '@qode-agent/qmain@0.3.0':
+    resolution: {integrity: sha512-7ehFchgOtkEyxHpTgKQUBPBusucr6LTVsV+al8V6bpKCOmu/J3TXwjMBJt7J2tdltA5KVMeFg5r7Ilaurqd1XA==}
+    engines: {node: '>=22.19.0'}
+
+  '@qode-agent/qollab@0.3.0':
+    resolution: {integrity: sha512-QBOqgGLbbqgwEkEK7KHPmLLakjBCf7/qWhazw1nUfjBB3OPYqzFYLml96PulnJfCE3naEjaYI5RrIHs9xM02NQ==}
+
   '@qode-agent/qprovs@0.2.11':
     resolution: {integrity: sha512-wUBl2RtmCtMtjyBdR0R7nFhak/Va5qB0AIRxKexe/odP54Dkq5Ti9GmfYR3a7TElsXNEVAvkq2svumFsB2v2Cw==}
+    engines: {node: '>=22.19.0'}
+
+  '@qode-agent/qprovs@0.3.0':
+    resolution: {integrity: sha512-uesSIoSGXRfcxhStwqYPIw+72E/ISfb5ZO8+J9CYOZvxYq7EOfc3yIGW5uWKKY5qM3UmergC+tS8hNB5fa4FSg==}
     engines: {node: '>=22.19.0'}
 
   '@qode-agent/runtime@0.2.11':
     resolution: {integrity: sha512-QaIvYpnAnNPYJunnjCupWqiETh4tqlhZ7cO/+BNYxZkoCsu6m3Wmg+9uOrHYh9nndsvnVD4pCn/a5OtrW5kglQ==}
     engines: {node: '>=22.19.0'}
 
+  '@qode-agent/runtime@0.3.0':
+    resolution: {integrity: sha512-Qi6DYTxzpIs0lnOWHMAu1SMHCvizf115IXKeabW7xeOFrBfmxUMvDKOgETtzWj+yXVGlTuj9FRptUJeKLBxCUA==}
+    engines: {node: '>=22.19.0'}
+
   '@qode-agent/telemetry@0.2.11':
     resolution: {integrity: sha512-mSvTmDhhr3q4lz0ovIT9JBu6nQXSm7KgVCPbgm8lT+QW1eV1R4XjQBdYFYWC9UnthPNls4hg5PaoVaFTqvahNw==}
+    engines: {node: '>=22.19.0'}
+
+  '@qode-agent/telemetry@0.3.0':
+    resolution: {integrity: sha512-2gWOQjbPRA8lwAlGQ0n9B7DuJcATtPvctPHPekSI6QwnILmKV1fAa4qGfi+cBn3+XGTlurUdKqWMRG5bI1H6Cg==}
     engines: {node: '>=22.19.0'}
 
   '@quansync/fs@1.0.0':
@@ -2560,6 +2591,14 @@ snapshots:
       pathe: 2.0.3
       zod: 4.4.3
 
+  '@qode-agent/agent-core@0.3.0':
+    dependencies:
+      '@qode-agent/qmain': 0.3.0
+      '@qode-agent/qprovs': 0.3.0
+      '@qode-agent/telemetry': 0.3.0
+      pathe: 2.0.3
+      zod: 4.4.3
+
   '@qode-agent/cli@0.2.11':
     dependencies:
       '@babel/parser': 7.29.7
@@ -2597,13 +2636,35 @@ snapshots:
 
   '@qode-agent/oauth@0.2.11': {}
 
+  '@qode-agent/oauth@0.3.0': {}
+
   '@qode-agent/protocol@0.2.11': {}
+
+  '@qode-agent/protocol@0.3.0': {}
 
   '@qode-agent/qmain@0.2.11':
     dependencies:
       pathe: 2.0.3
 
+  '@qode-agent/qmain@0.3.0':
+    dependencies:
+      pathe: 2.0.3
+
+  '@qode-agent/qollab@0.3.0':
+    dependencies:
+      '@qode-agent/protocol': 0.3.0
+      better-sqlite3: 11.10.0
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@qode-agent/qprovs@0.2.11':
+    dependencies:
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.2(zod@4.4.3)
+
+  '@qode-agent/qprovs@0.3.0':
     dependencies:
       zod: 4.4.3
       zod-to-json-schema: 3.25.2(zod@4.4.3)
@@ -2627,7 +2688,32 @@ snapshots:
       zod: 4.4.3
       zod-to-json-schema: 3.25.2(zod@4.4.3)
 
+  '@qode-agent/runtime@0.3.0':
+    dependencies:
+      '@qode-agent/agent-core': 0.3.0
+      '@qode-agent/oauth': 0.3.0
+      '@qode-agent/qmain': 0.3.0
+      '@qode-agent/qollab': 0.3.0
+      '@qode-agent/qprovs': 0.3.0
+      '@qode-agent/telemetry': 0.3.0
+      diff: 9.0.0
+      ignore: 7.0.5
+      js-yaml: 4.1.1
+      lru-cache: 11.5.1
+      p-limit: 6.2.0
+      pathe: 2.0.3
+      pino: 9.14.0
+      smol-toml: 1.6.1
+      uuid: 11.1.1
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.2(zod@4.4.3)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@qode-agent/telemetry@0.2.11': {}
+
+  '@qode-agent/telemetry@0.3.0': {}
 
   '@quansync/fs@1.0.0':
     dependencies:

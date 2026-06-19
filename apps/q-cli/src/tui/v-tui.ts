@@ -59,6 +59,9 @@ import { dispatchInput, ALL_SLASH_COMMANDS, sortSlashCommands, type SlashCommand
 import { ConfirmationDropdownComponent } from "./components/confirmation-dropdown.js";
 import { RevisionInputComponent } from "./components/revision-input.js";
 import { PlanModeController, PlanDropdownComponent, PlanRevisionInputComponent } from "./plan/index.js";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { homedir } from "node:os";
 import { getCliVersion } from "../version.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -876,6 +879,27 @@ export class QTui {
       },
       collabShowStatus: () => {
         this.collabManager?.showStatus();
+      },
+      collabShowKey: () => {
+        // Read the session key from the saved active session file
+        const activeFile = resolve(homedir(), ".Q", "collab", "active-session.json");
+        if (existsSync(activeFile)) {
+          try {
+            const raw = readFileSync(activeFile, "utf-8");
+            const config = JSON.parse(raw);
+            if (config.sessionKey) {
+              this.showStatus(`Session Key: ${config.sessionKey}`, "info");
+              this.showStatus(`Server: ws://127.0.0.1:${config.serverPort ?? 19876}`, "info");
+              this.showStatus(`Share this key with attendees to let them join.`, "plain");
+            } else {
+              this.showStatus("No session key found in saved config.", "error");
+            }
+          } catch {
+            this.showStatus("Could not read saved session config.", "error");
+          }
+        } else {
+          this.showStatus("No active session file found.", "error");
+        }
       },
     };
   }

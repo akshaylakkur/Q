@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/protocol",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Qode — Shared local-to-remote wire protocol types",
   "type": "module",
   "main": "./dist/index.mjs",

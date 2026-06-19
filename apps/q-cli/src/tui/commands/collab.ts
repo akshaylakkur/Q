@@ -194,6 +194,16 @@ export function handleCollabStatusCommand(host: SlashCommandHost, _args: string)
   host.collabShowStatus();
 }
 
+// ─── /collab-key ──────────────────────────────────────────────────
+
+export function handleCollabKeyCommand(host: SlashCommandHost, _args: string): void {
+  if (!host.collabShowKey) {
+    host.showError("Collaboration is not active.");
+    return;
+  }
+  host.collabShowKey();
+}
+
 // ─── /collab-rekey ────────────────────────────────────────────────
 
 export function handleCollabRekeyCommand(host: SlashCommandHost, _args: string): void {
