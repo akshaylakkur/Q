@@ -152,7 +152,8 @@ async function handleInit(
   const client = new QollabSessionClient({
     serverUrl: `ws://127.0.0.1:${port}`,
     sessionKey,
-    displayName: userId,
+    displayName,
+    userId,
     onEvent: (_event: QollabServerEvent) => {
       // Events are handled by the TUI via handleCollabEvent
     },

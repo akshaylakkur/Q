@@ -17,6 +17,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { QollabServerEvent, QollabClientEvent, QollabSession, QollabAttendee, QollabSessionMetadata, QollabPermissions, MergeReport } from "../types.js";
 import { QollabSessionStore } from "./session-store.js";
 import { QollabAdmission } from "../auth/admission.js";
+import { assignColor } from "../auth/encryption.js";
 import { QollabChatRelay } from "../chat/chat-relay.js";
 import type { SessionConnection } from "./types.js";
 
@@ -110,9 +111,23 @@ export class QollabSessionServer {
   /**
    * Create a live session directly (for the master, without needing a WebSocket connection).
    * This is used by the CLI to bootstrap the session before the TUI starts.
+   * Adds the master as the first attendee so findAttendee() works for master messages.
    */
   createLiveSession(sessionId: string, masterUserId: string, displayName: string): void {
     const now = new Date().toISOString();
+    const masterColor = assignColor(masterUserId, [
+      "#22D3EE", "#A78BFA", "#FBBF24", "#4ADE80", "#FB7185", "#38BDF8", "#F472B6", "#34D399",
+    ]);
+
+    const masterAttendee: QollabAttendee = {
+      userId: masterUserId,
+      displayName,
+      color: masterColor,
+      role: "master",
+      joinedAt: now,
+      connectionStatus: "online",
+    };
+
     const session: QollabSession = {
       sessionId,
       sessionKey: "",
@@ -134,7 +149,7 @@ export class QollabSessionServer {
         ttlMs: 86400000,
         encryptionAlgorithm: "AES-256-GCM",
       },
-      attendees: [],
+      attendees: [masterAttendee],
       snapshotRef: "",
     };
 
@@ -146,6 +161,9 @@ export class QollabSessionServer {
       masterUserId,
       session.metadata,
     );
+
+    // Persist the master as an attendee
+    this.store.addAttendee(masterAttendee, sessionId);
 
     this.liveSessions.set(sessionId, {
       session,
@@ -251,7 +269,7 @@ export class QollabSessionServer {
         if (!authenticated) {
           // Only auth messages allowed before authentication
           if (parsed.type === "auth") {
-            const result = this.handleAuth(ws, parsed.sessionKey, parsed.displayName, connection);
+            const result = this.handleAuth(ws, parsed.sessionKey, parsed.displayName, parsed.userId, connection);
             if (result) {
               authenticated = true;
               sessionId = result.sessionId;
@@ -297,6 +315,7 @@ export class QollabSessionServer {
     ws: WebSocket,
     sessionKey: string,
     displayName: string,
+    userIdFromClient: string | undefined,
     connection: SessionConnection,
   ): { sessionId: string; userId: string; role: "master" | "attendee" } | null {
     // Authenticate the session key via the admission manager
@@ -315,13 +334,25 @@ export class QollabSessionServer {
       return null;
     }
 
-    // Check if this is the master (by userId match)
-    if (live.session.masterUserId === displayName) {
+    // Determine if this connection is the master: check if the provided
+    // userId matches masterUserId, or if the displayName matches the
+    // master attendee's displayName (fallback).
+    const isMaster =
+      userIdFromClient === live.session.masterUserId ||
+      live.session.attendees.some(
+        (a) => a.userId === userIdFromClient && a.role === "master",
+      ) ||
+      live.session.masterUserId === displayName;
+
+    if (isMaster) {
       // Master reconnecting
       const userId = live.session.masterUserId;
       connection.role = "master";
       connection.userId = userId;
       live.masterConnections.set(userId, connection);
+
+      // Mark the master attendee as online
+      this.store.updateAttendeeStatus(userId, "online");
 
       connection.send({ type: "session.state", session: live.session });
       return { sessionId: authSessionId, userId, role: "master" };

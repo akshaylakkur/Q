@@ -875,10 +875,22 @@ export class QTui {
         this.collabManager?.rejectSnapshot(reason);
       },
       collabSnapshotPush: () => {
-        this.collabManager?.pushSnapshot();
+        // Pushing the current state as a snapshot requires creating a snapshot
+        // from the local workspace and sending it. This is not yet fully
+        // implemented in the session client.
+        this.showStatus("Snapshot push: not yet implemented in session client.", "warning");
       },
       collabShowStatus: () => {
-        this.collabManager?.showStatus();
+        // Show current collab session info from app state
+        const { isCollab, collabRole, collabAttendeeCount, collabPendingCount, collabDisplayName, collabSessionId, collabSnapshotInfo } = this.appState;
+        if (!isCollab) {
+          this.showStatus("No active collaboration session.", "error");
+          return;
+        }
+        this.showStatus(`Role: ${collabRole ?? "?"}  |  Display: ${collabDisplayName ?? "?"}`, "info");
+        this.showStatus(`Attendees: ${collabAttendeeCount ?? 0}  |  Pending: ${collabPendingCount ?? 0}`, "info");
+        this.showStatus(`Session: ${collabSessionId?.slice(0, 12) ?? "?"}...`, "plain");
+        if (collabSnapshotInfo) this.showStatus(collabSnapshotInfo, "plain");
       },
       collabShowKey: () => {
         // Read the session key from the saved active session file

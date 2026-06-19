@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/qollab",
-  "version": "0.3.2",
+  "version": "0.3.4",
   "publishConfig": {
     "access": "public"
   },
@@ -18,7 +18,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@qode-agent/protocol": "0.3.1",
+    "@qode-agent/protocol": "0.3.4",
     "better-sqlite3": "^11.7.0",
     "ws": "^8.18.0"
   },

@@ -125,7 +125,7 @@ export type QollabServerEvent =
   | { type: "heartbeat" };
 
 export type QollabClientEvent =
-  | { type: "auth"; sessionKey: string; displayName: string }
+  | { type: "auth"; sessionKey: string; displayName: string; userId?: string }
   | { type: "chat.send"; text: string; replyTo?: string; targetUserId?: string }
   | { type: "snapshot.pull" }
   | { type: "snapshot.sync-request"; prompt: string }

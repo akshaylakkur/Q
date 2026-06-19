@@ -19,6 +19,7 @@ export class QollabSessionClient {
   private readonly serverUrl: string;
   private readonly sessionKey: string;
   private readonly displayName: string;
+  private readonly userId?: string;
   private connected = false;
   private authenticated = false;
   private reconnectAttempts = 0;
@@ -28,11 +29,14 @@ export class QollabSessionClient {
   private onDisconnectCallback?: () => void;
   private onErrorCallback?: (err: Error) => void;
   private intentionalClose = false;
+  /** Buffer for events that arrive before a callback is properly set */
+  private eventBuffer: QollabServerEvent[] = [];
 
   constructor(options: {
     serverUrl: string;
     sessionKey: string;
     displayName: string;
+    userId?: string;
     onEvent: (event: QollabServerEvent) => void;
     onDisconnect?: () => void;
     onError?: (err: Error) => void;
@@ -40,6 +44,7 @@ export class QollabSessionClient {
     this.serverUrl = options.serverUrl;
     this.sessionKey = options.sessionKey;
     this.displayName = options.displayName;
+    this.userId = options.userId;
     this.onEventCallback = options.onEvent;
     this.onDisconnectCallback = options.onDisconnect;
     this.onErrorCallback = options.onError;
@@ -62,12 +67,16 @@ export class QollabSessionClient {
         this.connected = true;
         this.reconnectAttempts = 0;
 
-        // Send authentication
-        this.send({
+        // Send authentication — include userId if we have one (master)
+        const authMsg: Record<string, string> = {
           type: "auth",
           sessionKey: this.sessionKey,
           displayName: this.displayName,
-        });
+        };
+        if (this.userId) {
+          authMsg.userId = this.userId;
+        }
+        this.send(authMsg as QollabClientEvent);
       });
 
       this.ws.on("message", (data: Buffer) => {
@@ -82,13 +91,20 @@ export class QollabSessionClient {
         // Handle auth response
         if (event.type === "session.state") {
           this.authenticated = true;
+          // Buffer the session.state event so the TUI callback receives it
+          this.eventBuffer.push(event);
           resolve();
+          this.flushBuffer();
+          return;
         }
 
         // Handle pending state (attendee authenticated but not yet admitted)
         if (event.type === "attendee.pending") {
           this.authenticated = true;
+          this.eventBuffer.push(event);
           resolve();
+          this.flushBuffer();
+          return;
         }
 
         // Handle rejection
@@ -109,8 +125,9 @@ export class QollabSessionClient {
           return;
         }
 
-        // Forward to callback
-        this.onEventCallback(event);
+        // Forward to callback (buffer if not yet flushed)
+        this.eventBuffer.push(event);
+        this.flushBuffer();
       });
 
       this.ws.on("close", () => {
@@ -236,9 +253,11 @@ export class QollabSessionClient {
 
   /**
    * Set the event callback (used by the TUI to wire in its handler after construction).
+   * Flushes any buffered events to the new callback.
    */
   setEventCallback(callback: (event: QollabServerEvent) => void): void {
     this.onEventCallback = callback;
+    this.flushBuffer();
   }
 
   /**
@@ -254,6 +273,17 @@ export class QollabSessionClient {
   private send(event: QollabClientEvent): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(event));
+    }
+  }
+
+  /**
+   * Flush buffered events to the current callback.
+   */
+  private flushBuffer(): void {
+    if (this.eventBuffer.length === 0) return;
+    const buffer = this.eventBuffer.splice(0);
+    for (const event of buffer) {
+      this.onEventCallback(event);
     }
   }
 }
