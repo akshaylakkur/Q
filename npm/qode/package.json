@@ -1,6 +1,6 @@
 {
   "name": "qode-agent",
-  "version": "0.3.1",
+  "version": "0.3.3",
   "description": "Qode — Autonomous Coding Agent. Full-stack AI coding agent for your terminal. Includes QSSH remote execution.",
   "bin": {
     "q-cli": "bin/q-cli",
@@ -10,7 +10,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@qode-agent/cli": "0.3.1"
+    "@qode-agent/cli": "0.3.3"
   },
   "files": [
     "bin/",

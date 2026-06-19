@@ -1,7 +1,6 @@
 {
   "name": "@qode-agent/q-remote",
-  "version": "0.3.1",
-  "description": "Qode — Headless remote agent daemon for cloud execution",
+  "version": "0.3.3",
   "type": "module",
   "bin": {
     "q-remote": "dist/main.mjs"
@@ -18,7 +17,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@qode-agent/runtime": "0.3.1",
+    "@qode-agent/runtime": "0.3.3",
     "@qode-agent/agent-core": "0.3.1",
     "@qode-agent/qprovs": "0.3.1",
     "@qode-agent/qmain": "0.3.1",

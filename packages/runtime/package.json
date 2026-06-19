@@ -1,8 +1,6 @@
 {
   "name": "@qode-agent/runtime",
-  "version": "0.3.1",
-  "description": "Qode — Shared app-level runtime (orchestrator, memory, mcp, skills, records, config)",
-  "type": "module",
+  "version": "0.3.3",
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
@@ -23,7 +21,7 @@
   },
   "dependencies": {
     "@qode-agent/agent-core": "0.3.1",
-    "@qode-agent/qollab": "workspace:*",
+    "@qode-agent/qollab": "0.3.2",
     "@qode-agent/qprovs": "0.3.1",
     "@qode-agent/qmain": "0.3.1",
     "@qode-agent/telemetry": "0.3.1",
