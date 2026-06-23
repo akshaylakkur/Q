@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/node-sdk",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Qode — SDK for extending/embedding the Qode agent",
   "type": "module",
   "main": "./dist/index.mjs",

@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/qmain",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Qode — Execution environment abstraction (local, SSH, Docker)",
   "type": "module",
   "main": "./dist/index.mjs",

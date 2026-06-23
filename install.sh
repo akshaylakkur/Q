@@ -72,9 +72,9 @@ cat << 'ART'
  \ \_/ /
   \___/
 
-    Q — v0.3.7
+    Q — v0.3.8
 ART
-header "Q — Autonomous Coding Agent  v0.3.7"
+header "Q — Autonomous Coding Agent  v0.3.8"
 echo ""
 info "Project root: ${PROJECT_DIR}"
 info "Install target: ${Q_HOME}"
