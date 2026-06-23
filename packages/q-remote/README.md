@@ -2,6 +2,8 @@
 
 Qode — Headless remote agent daemon for cloud execution. Installed on remote servers to enable QSSH (Qode SSH) remote execution sessions.
 
+**Version:** 0.3.5
+
 ## Install
 
 ```bash

@@ -1,6 +1,6 @@
 # Qode (qode-agent)
 
-Node SDK v0.1.0
+v0.3.5
 
 MIT
 

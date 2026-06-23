@@ -8,7 +8,6 @@ import type { Command } from "commander";
  */
 export async function daemonCommand(options: {
   port?: string;
-  collaborative?: boolean;
 }): Promise<void> {
   console.log(chalk.bold("V Daemon"));
   console.log(chalk.dim("  Long-running server mode — not yet implemented."));
@@ -16,9 +15,6 @@ export async function daemonCommand(options: {
 
   if (options.port) {
     console.log(chalk.dim(`  Requested port: ${options.port}`));
-  }
-  if (options.collaborative) {
-    console.log(chalk.dim("  Collaborative mode enabled"));
   }
 
   console.log();
@@ -34,8 +30,7 @@ export function registerDaemonCommand(prog: Command): void {
     .command("daemon")
     .description("Start long-running server mode")
     .option("-p, --port <port>", "TCP port for the daemon to listen on")
-    .option("--collaborative", "Enable multi-user collaborative sessions")
-    .action(async (opts: { port?: string; collaborative?: boolean }) => {
+    .action(async (opts: { port?: string }) => {
       await daemonCommand(opts).catch((err: Error) => {
         console.error(chalk.red("Daemon command error:"), err.message);
         process.exit(1);

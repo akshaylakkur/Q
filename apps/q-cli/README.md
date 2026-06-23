@@ -2,6 +2,8 @@
 
 Qode — Autonomous Coding Agent CLI. The terminal-based AI coding agent for long-running tasks and massive codebase development.
 
+**Version:** 0.3.5
+
 ## Install
 
 ```bash

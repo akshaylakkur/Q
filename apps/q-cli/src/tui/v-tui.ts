@@ -159,16 +159,6 @@ export class QTui {
   private auditLog?: AuditLogComponent;
   private instanceMetadata?: InstanceMetadataComponent;
 
-  // Qollab Collaboration
-  private collabManager?: import("@qode-agent/qollab").QollabSessionClient;
-  private collabServer?: import("@qode-agent/qollab").QollabSessionServer;
-  private collabAdmission?: import("@qode-agent/qollab").QollabAdmission;
-  private collabSessionId?: string;
-  private collabUserId?: string;
-  private collabDisplayName?: string;
-  private collabRole?: "master" | "attendee";
-  private collabPendingCount: number = 0;
-
   constructor(options: TuiOptions) {
     this.agent = options.agent;
     this.workDir = options.workDir;
@@ -196,30 +186,8 @@ export class QTui {
       executionMode: "not set",
       modusMaximusPhase: "idle",
       activeAgent: "auto",
-      isCollab: false,
-      collabRole: undefined,
-      collabAttendeeCount: 0,
-      collabPendingCount: 0,
-      collabDisplayName: undefined,
-      collabSessionId: undefined,
-      collabSnapshotInfo: undefined,
+      isRemote: false,
     };
-
-    // ── Qollab Collaboration wiring ──────────────────────────────────
-    if (options.collabClient) {
-      this.collabManager = options.collabClient;
-      this.collabServer = options.collabServer;
-      this.collabAdmission = options.collabAdmission;
-      this.collabSessionId = options.sessionId;
-      this.collabUserId = options.collabUserId;
-      this.collabDisplayName = options.collabDisplayName;
-      this.collabRole = options.collabRole;
-
-      this.appState.isCollab = true;
-      this.appState.collabRole = options.collabRole;
-      this.appState.collabDisplayName = options.collabDisplayName;
-      this.appState.collabSessionId = options.sessionId;
-    }
 
     // Initialize plan mode controller
     this.planModeController = new PlanModeController();
@@ -386,132 +354,6 @@ export class QTui {
       this.handleAgentEvent(event as AgentEvent);
       return;
     }
-  }
-
-  // ── Qollab Collaboration ──────────────────────────────────────────
-
-  /**
-   * Attach a collaboration session to the TUI.
-   * Called when starting or joining a Qollab session.
-   */
-  attachCollab(options: {
-    client: import("@qode-agent/qollab").QollabSessionClient;
-    server?: import("@qode-agent/qollab").QollabSessionServer;
-    admission?: import("@qode-agent/qollab").QollabAdmission;
-    sessionId: string;
-    userId: string;
-    displayName: string;
-    role: "master" | "attendee";
-  }): void {
-    this.collabManager = options.client;
-    this.collabServer = options.server;
-    this.collabAdmission = options.admission;
-    this.collabSessionId = options.sessionId;
-    this.collabUserId = options.userId;
-    this.collabDisplayName = options.displayName;
-    this.collabRole = options.role;
-
-    this.appState.isCollab = true;
-    this.appState.collabRole = options.role;
-    this.appState.collabDisplayName = options.displayName;
-    this.appState.collabSessionId = options.sessionId;
-
-    this.showStatus(
-      `Qollab session started as ${options.role}. Display name: ${options.displayName}`,
-      "success",
-    );
-    this.ui.requestRender();
-  }
-
-  /**
-   * Handle an incoming Qollab server event in the TUI.
-   */
-  handleCollabEvent(event: import("@qode-agent/qollab").QollabServerEvent): void {
-    switch (event.type) {
-      case "chat.message": {
-        const msg = event.message;
-        if (msg.type === "system") {
-          this.showStatus(`[System] ${msg.text}`, "plain");
-        } else if (msg.type === "whisper") {
-          this.showStatus(`[Whisper from ${msg.displayName}] ${msg.text}`, "info");
-        } else {
-          this.showStatus(`[${msg.displayName}] ${msg.text}`, "plain");
-        }
-        break;
-      }
-      case "attendee.joined": {
-        this.appState.collabAttendeeCount = (this.appState.collabAttendeeCount ?? 0) + 1;
-        this.showStatus(`${event.attendee.displayName} joined the session.`, "success");
-        break;
-      }
-      case "attendee.left": {
-        this.appState.collabAttendeeCount = Math.max(0, (this.appState.collabAttendeeCount ?? 1) - 1);
-        this.showStatus(`Attendee left: ${event.userId.slice(0, 8)}...`, "info");
-        break;
-      }
-      case "attendee.pending": {
-        this.appState.collabPendingCount = (this.appState.collabPendingCount ?? 0) + 1;
-        this.showStatus(
-          `${event.displayName} wants to join. Use /admit ${event.userId}`,
-          "warning",
-        );
-        break;
-      }
-      case "attendee.admitted": {
-        this.showStatus(`Attendee admitted.`, "success");
-        break;
-      }
-      case "attendee.rejected": {
-        this.showStatus(`Attendee rejected: ${event.reason ?? "No reason"}`, "error");
-        break;
-      }
-      case "snapshot.created": {
-        this.appState.collabSnapshotInfo = `Snapshot: ${event.snapshot.manifest.totalFiles} files`;
-        this.showStatus(
-          `Snapshot updated: ${event.snapshot.manifest.totalFiles} files, ${event.snapshot.manifest.changedFiles.length} changed`,
-          "success",
-        );
-        break;
-      }
-      case "snapshot.sync-request": {
-        this.showStatus(
-          `[Sync Request] ${event.displayName}: ${event.prompt.slice(0, 60)}...`,
-          "warning",
-        );
-        this.showStatus(
-          `Approve with /snapshot-approve <id>, reject with /snapshot-reject <reason>`,
-          "info",
-        );
-        break;
-      }
-      case "snapshot.sync-accepted": {
-        this.showStatus(`Snapshot sync accepted by master.`, "success");
-        break;
-      }
-      case "snapshot.sync-rejected": {
-        this.showStatus(`Snapshot sync rejected: ${event.reason}`, "error");
-        break;
-      }
-      case "session.state": {
-        const session = event.session;
-        this.appState.collabAttendeeCount = session.attendees.length;
-        this.showStatus(
-          `Session active: ${session.metadata.displayName} (${session.attendees.length} attendees)`,
-          "success",
-        );
-        break;
-      }
-      case "session.expired": {
-        this.showStatus("Session has expired.", "error");
-        this.appState.isCollab = false;
-        break;
-      }
-      case "error": {
-        this.showStatus(`Error: ${event.message}`, "error");
-        break;
-      }
-    }
-    this.ui.requestRender();
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────
@@ -842,41 +684,6 @@ export class QTui {
         // Future: telemetry integration
       },
       requestRender: () => this.ui.requestRender(),
-
-      // ── Qollab Collaboration ──────────────────────────────────────
-      collabSendChat: (text: string) => {
-        this.collabManager?.sendChat(text);
-      },
-      collabSendWhisper: (userId: string, text: string) => {
-        this.collabManager?.sendWhisper(userId, text);
-      },
-      collabAdmit: (userId: string) => {
-        this.collabManager?.admitAttendee(userId);
-      },
-      collabReject: (userId: string, reason?: string) => {
-        this.collabManager?.rejectAttendee(userId, reason);
-      },
-      collabKick: (userId: string) => {
-        this.collabManager?.kickAttendee(userId);
-      },
-      collabSnapshotPull: () => {
-        this.collabManager?.requestSnapshotPull();
-      },
-      collabSnapshotSync: (prompt: string) => {
-        this.collabManager?.requestSnapshotSync(prompt);
-      },
-      collabSnapshotApprove: (snapshotId: string) => {
-        this.collabManager?.acceptSnapshot(snapshotId);
-      },
-      collabSnapshotReject: (reason: string) => {
-        this.collabManager?.rejectSnapshot(reason);
-      },
-      collabSnapshotPush: () => {
-        this.collabManager?.pushSnapshot();
-      },
-      collabShowStatus: () => {
-        this.collabManager?.showStatus();
-      },
     };
   }
 
@@ -1676,7 +1483,7 @@ Follow the plan carefully. Complete each step before moving to the next.`;
     this.appState.modusMaximusPhase = "planning";
 
     const status = new StatusMessageComponent(
-      "📋 Generating Modus Maximus plan...",
+      "Generating Modus Maximus plan...",
       this.colors,
       "info",
     );
@@ -1699,7 +1506,7 @@ Follow the plan carefully. Complete each step before moving to the next.`;
     }
 
     const status = new StatusMessageComponent(
-      `✅ Plan generated — ${this.modusMaximusStepCount} steps`,
+      `Plan generated — ${this.modusMaximusStepCount} steps`,
       this.colors,
       "success",
       event.planFilePath ?? "",
@@ -1811,7 +1618,7 @@ Follow the plan carefully. Complete each step before moving to the next.`;
     if (instructions.trim()) {
       // We use a styled text block to show the instructions
       const instructionsStatus = new StatusMessageComponent(
-        instructions.trim().slice(0, 200) + (instructions.trim().length > 200 ? "…" : ""),
+        instructions.trim().slice(0, 200) + (instructions.trim().length > 200 ? "..." : ""),
         this.colors,
         "info",
       );
@@ -1839,7 +1646,7 @@ Follow the plan carefully. Complete each step before moving to the next.`;
     this.streaming.reset();
 
     const status = new StatusMessageComponent(
-      `✅ Step ${stepIndex} completed`,
+      `Step ${stepIndex} completed`,
       this.colors,
       "success",
     );
@@ -1859,7 +1666,7 @@ Follow the plan carefully. Complete each step before moving to the next.`;
 
     const errorMsg = event.error ?? "unknown error";
     const status = new StatusMessageComponent(
-      `❌ Step ${stepIndex} failed — ${errorMsg}`,
+      `Step ${stepIndex} failed — ${errorMsg}`,
       this.colors,
       "error",
     );
@@ -1882,7 +1689,7 @@ Follow the plan carefully. Complete each step before moving to the next.`;
 
     // Show completion status
     const status = new StatusMessageComponent(
-      `🏆 Modus Maximus complete: ${event.completedSteps ?? 0}/${event.totalSteps ?? 0} steps succeeded`,
+      `Modus Maximus complete: ${event.completedSteps ?? 0}/${event.totalSteps ?? 0} steps succeeded`,
       this.colors,
       "success",
     );

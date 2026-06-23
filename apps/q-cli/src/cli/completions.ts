@@ -68,7 +68,7 @@ function generateBashCompletions(): void {
     "            fi",
     "            ;;",
     "        daemon)",
-    '            COMPREPLY=($(compgen -W "-p --port --collaborative" -- "$cur"))',
+    '            COMPREPLY=($(compgen -W "-p --port" -- "$cur"))',
     "            ;;",
     "    esac",
     "} && complete -F _q_cli q-cli",

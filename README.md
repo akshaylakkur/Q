@@ -1,6 +1,6 @@
 # Qode (q-cli)
 
-Node SDK v0.1.0
+v0.3.5
 
 MIT
 
@@ -41,15 +41,19 @@ Qode provides an autonomous agent runtime, enabling you to:
 
 ## Available Packages
 
-| Package | Description | Status |
-|---------|-------------|--------|
-| `apps/q-cli` | Main CLI — orchestrator, TUI, memory, MCP, plugins, verification | Available |
-| `packages/agent-core` | Core agent runtime — context, turn loop, tools, sub-agents, profiles | Available |
-| `packages/qprovs` | LLM provider abstraction | Available |
-| `packages/qmain` | Execution environment — file ops, shell, git, web | Available |
-| `packages/node-sdk` | Programmatic Node.js SDK | Available |
-| `packages/oauth` | OAuth 2.0 for MCP server auth | Available |
-| `packages/telemetry` | Optional crash reporting and telemetry | Available |
+| Package | Version | Description | Status |
+|---------|---------|-------------|--------|
+| `qode-agent` | 0.3.5 | Umbrella package — installs the CLI and all dependencies | Published |
+| `@qode-agent/cli` | 0.3.5 | Main CLI — orchestrator, TUI, memory, MCP, plugins, verification | Published |
+| `@qode-agent/agent-core` | 0.3.5 | Core agent runtime — context, turn loop, tools, sub-agents, profiles | Published |
+| `@qode-agent/runtime` | 0.3.5 | Shared app-level runtime — orchestrator, memory, MCP, skills, config | Published |
+| `@qode-agent/qprovs` | 0.3.5 | LLM provider abstraction | Published |
+| `@qode-agent/qmain` | 0.3.5 | Execution environment — file ops, shell, git, web | Published |
+| `@qode-agent/protocol` | 0.3.5 | Shared local-to-remote wire protocol types | Published |
+| `@qode-agent/q-remote` | 0.3.5 | Headless remote agent daemon for QSSH | Published |
+| `@qode-agent/node-sdk` | 0.3.5 | Programmatic Node.js SDK | Published |
+| `@qode-agent/oauth` | 0.3.5 | OAuth 2.0 for MCP server auth | Published |
+| `@qode-agent/telemetry` | 0.3.5 | Optional crash reporting and telemetry | Published |
 
 ---
 

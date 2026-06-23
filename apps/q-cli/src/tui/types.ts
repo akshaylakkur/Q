@@ -33,20 +33,6 @@ export interface TuiAppState {
   remoteInfo?: import("@qode-agent/protocol").RemoteSessionInfo;
   /** Connection health when in remote mode. */
   connectionHealth?: import("@qode-agent/protocol").ConnectionHealth;
-  /** Whether this TUI is in collaboration mode (Qollab). */
-  isCollab: boolean;
-  /** Collaboration session info (when isCollab is true). */
-  collabSessionId?: string;
-  /** Current user's role in the collaboration. */
-  collabRole?: "master" | "attendee";
-  /** Number of attendees in the current collab session. */
-  collabAttendeeCount?: number;
-  /** Current user's display name in the collab session. */
-  collabDisplayName?: string;
-  /** Whether there are pending admission requests (master only). */
-  collabPendingCount?: number;
-  /** Latest snapshot info. */
-  collabSnapshotInfo?: string;
 }
 
 // ── Transcript Entries ─────────────────────────────────────────────────
@@ -188,18 +174,6 @@ export interface TuiOptions {
     submitPrompt?(prompt: string): Promise<ExecutionResult>;
     cancel?(): void;
   };
-  /** Qollab collaboration session client (if in collab mode) */
-  collabClient?: import("@qode-agent/qollab").QollabSessionClient;
-  /** Qollab session server (if master started one) */
-  collabServer?: import("@qode-agent/qollab").QollabSessionServer;
-  /** Qollab admission manager (if master) */
-  collabAdmission?: import("@qode-agent/qollab").QollabAdmission;
-  /** Current user's collab role */
-  collabRole?: "master" | "attendee";
-  /** Current user's display name in collab */
-  collabDisplayName?: string;
-  /** Current user's collab user ID */
-  collabUserId?: string;
 }
 
 // Import ExecutionResult type for the orchestrator interface

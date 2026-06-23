@@ -12,7 +12,6 @@ export default defineConfig({
   // Keep workspace + external packages external — they resolve at runtime.
   external: [
     "@qode-agent/agent-core",
-    "@qode-agent/qollab",
     "@qode-agent/qprovs",
     "@qode-agent/qmain",
     "@qode-agent/telemetry",

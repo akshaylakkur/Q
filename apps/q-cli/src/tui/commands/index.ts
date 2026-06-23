@@ -24,21 +24,6 @@ import {
 } from "./agent.js";
 import { handleQmdCommand } from "./qmd.js";
 import { handlePlanCommand } from "../plan/plan-handler.js";
-import {
-  handleAdmitCommand,
-  handleRejectCommand,
-  handleKickCommand,
-  handleMsgCommand,
-  handleWhisperCommand,
-  handleSnapshotPushCommand,
-  handleSnapshotPullCommand,
-  handleSnapshotSyncCommand,
-  handleSnapshotApproveCommand,
-  handleSnapshotRejectCommand,
-  handleSnapshotDiffCommand,
-  handleCollabStatusCommand,
-  handleCollabRekeyCommand,
-} from "./collab.js";
 
 // =========================================================================
 // Re-exports
@@ -51,7 +36,6 @@ export * from "./resolve.js";
 export * from "./core.js";
 export * from "./agent.js";
 export * from "./qmd.js";
-export * from "./collab.js";
 
 // =========================================================================
 // Dispatch — main entry point
@@ -204,47 +188,6 @@ async function handleBuiltInSlashCommand(
     case "doctor":
     case "onboard":
       host.showStatus(`/${name} — planned for future release`);
-      return;
-
-    // ── Category 8: Qollab Collaboration ─────────────────────────────
-    case "admit":
-      handleAdmitCommand(host, args);
-      return;
-    case "reject":
-      handleRejectCommand(host, args);
-      return;
-    case "kick":
-      handleKickCommand(host, args);
-      return;
-    case "msg":
-      handleMsgCommand(host, args);
-      return;
-    case "whisper":
-      handleWhisperCommand(host, args);
-      return;
-    case "snapshot-push":
-      handleSnapshotPushCommand(host, args);
-      return;
-    case "snapshot-pull":
-      handleSnapshotPullCommand(host, args);
-      return;
-    case "snapshot-sync":
-      handleSnapshotSyncCommand(host, args);
-      return;
-    case "snapshot-approve":
-      handleSnapshotApproveCommand(host, args);
-      return;
-    case "snapshot-reject":
-      handleSnapshotRejectCommand(host, args);
-      return;
-    case "snapshot-diff":
-      handleSnapshotDiffCommand(host, args);
-      return;
-    case "collab-status":
-      handleCollabStatusCommand(host, args);
-      return;
-    case "collab-rekey":
-      handleCollabRekeyCommand(host, args);
       return;
 
     default:

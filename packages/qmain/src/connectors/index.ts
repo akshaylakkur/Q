@@ -36,3 +36,5 @@ export type {
   WebSearchOptions,
   WebSearchProvider,
 } from "./web-connector.js";
+
+export { OllamaWebSearchProvider } from "./ollama-web-search-provider.js";

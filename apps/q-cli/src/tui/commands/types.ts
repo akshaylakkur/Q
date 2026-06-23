@@ -33,8 +33,7 @@ export type CommandCategory =
   | "model"         // Category 4: Model & provider
   | "files"         // Category 5: Files & edits
   | "replay"        // Category 6: Replay & history
-  | "system"        // Category 7: Configuration & system
-  | "collab";       // Category 8: Qollab collaboration
+  | "system";       // Category 7: Configuration & system
 
 /**
  * A parsed slash input.
@@ -71,14 +70,6 @@ export interface SlashCommandHost {
     executionMode: string;
     /** Current active agent profile name (editius, rewritius, searchius, auto) */
     activeAgent: string;
-    /** Whether collaboration mode is active */
-    isCollab?: boolean;
-    /** Current user's role in collaboration */
-    collabRole?: "master" | "attendee";
-    /** Number of attendees */
-    collabAttendeeCount?: number;
-    /** Pending admission requests count */
-    collabPendingCount?: number;
   };
 
   // Agent access
@@ -123,28 +114,4 @@ export interface SlashCommandHost {
 
   // Render
   requestRender(): void;
-
-  // ── Qollab Collaboration ──────────────────────────────────────────
-  /** Send a chat message to all session participants */
-  collabSendChat?(text: string): void;
-  /** Send a whisper to a specific user */
-  collabSendWhisper?(userId: string, text: string): void;
-  /** Admit a pending attendee (master only) */
-  collabAdmit?(userId: string): void;
-  /** Reject a pending attendee (master only) */
-  collabReject?(userId: string, reason?: string): void;
-  /** Kick an attendee (master only) */
-  collabKick?(userId: string): void;
-  /** Request snapshot pull */
-  collabSnapshotPull?(): void;
-  /** Request snapshot sync with prompt */
-  collabSnapshotSync?(prompt: string): void;
-  /** Approve a proposed snapshot (master only) */
-  collabSnapshotApprove?(snapshotId: string): void;
-  /** Reject a proposed snapshot (master only) */
-  collabSnapshotReject?(reason: string): void;
-  /** Push current state as new snapshot (master only) */
-  collabSnapshotPush?(): void;
-  /** Show collab status */
-  collabShowStatus?(): void;
 }

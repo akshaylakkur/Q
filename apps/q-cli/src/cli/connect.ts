@@ -31,7 +31,7 @@ export function registerConnectCommand(prog: Command): void {
     .command("connect")
     .description("Connect to a running daemon")
     .argument("<url>", "Daemon URL (unix socket path or http://host:port)")
-    .option("--name <name>", "Your display name in collaborative sessions")
+    .option("--name <name>", "Your display name")
     .option("--key <key>", "Authentication key for the daemon")
     .action(async (url: string, opts: { name?: string; key?: string }) => {
       await connectCommand(url, opts).catch((err) => {

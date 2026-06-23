@@ -21,7 +21,7 @@
  */
 
 import { dirname } from "node:path";
-import { FileConnector, ShellConnector, WebConnector, ConnectorNotAvailableError } from "@q/qmain";
+import { FileConnector, ShellConnector, WebConnector, ConnectorNotAvailableError, OllamaWebSearchProvider } from "@q/qmain";
 import type { Qmain } from "@q/qmain";
 import { type ExecutableTool, ToolAccesses } from "../../loop/index.js";
 import type { ExecutableToolContext, ExecutableToolResult, ExecutableToolSuccessResult } from "../../loop/types.js";
@@ -101,6 +101,11 @@ export class ToolManager {
     this.fileConnector = new FileConnector(this.qmain);
     this.shellConnector = new ShellConnector(this.qmain, { cwd: agent.config.cwd });
     this.webConnector = new WebConnector();
+
+    // Auto-configure web search provider based on the agent's provider type.
+    // For ollama-cloud, we use the Ollama web search API with the same API key.
+    this.autoConfigureWebSearch();
+
     this.initializeBuiltinTools();
   }
 
@@ -112,6 +117,28 @@ export class ToolManager {
   /** Update the shell connector's default working directory */
   setShellCwd(cwd: string): void {
     this.shellConnector.setCwd(cwd);
+  }
+
+  /**
+   * Auto-configure the web search provider based on the agent's provider type.
+   *
+   * For ollama-cloud, we use the Ollama web search API with the same API key
+   * that's configured for the LLM provider. This means the agent can seamlessly
+   * search the web without any additional configuration.
+   */
+  private autoConfigureWebSearch(): void {
+    const providerConfig = this.agent.configData;
+    if (!providerConfig) return;
+
+    if (providerConfig.type === "ollama-cloud") {
+      const apiKey = providerConfig.apiKey ?? process.env.OLLAMA_API_KEY ?? "";
+      if (apiKey) {
+        const baseUrl = providerConfig.baseUrl ?? "https://ollama.com";
+        this.webConnector.setWebSearchProvider(
+          new OllamaWebSearchProvider({ apiKey, baseUrl }),
+        );
+      }
+    }
   }
 
   setActiveTools(names: readonly string[]): void {
@@ -763,7 +790,7 @@ function createWebSearchTool(webConnector: WebConnector): ExecutableTool {
     name: "WebSearch",
     description:
       "Search the web. Requires a configured search provider. " +
-      "Returns a list of results with title, url, and snippet.",
+      "Returns a list of results with title, url, snippet, and full article content when available.",
     parameters: {
       type: "object",
       properties: {
@@ -784,9 +811,20 @@ function createWebSearchTool(webConnector: WebConnector): ExecutableTool {
             if (results.length === 0) {
               return ok(`(no results for ${query})`);
             }
-            const lines = results.map(
-              (r, i) => `[${i + 1}] ${r.title}\n    ${r.url}\n    ${r.snippet}`,
-            );
+            const lines = results.map((r, i) => {
+              let entry = `[${i + 1}] ${r.title}\n    URL: ${r.url}\n    Snippet: ${r.snippet}`;
+              // Include full content if available (capped per-result to keep total manageable)
+              if (r.content) {
+                const maxContentLen = Math.floor(TOOL_OUTPUT_CAP / results.length) - entry.length;
+                if (maxContentLen > 100) {
+                  const content = r.content.length > maxContentLen
+                    ? r.content.slice(0, maxContentLen) + `\n    ... [truncated ${r.content.length - maxContentLen} bytes]`
+                    : r.content;
+                  entry += `\n    Content:\n${content}`;
+                }
+              }
+              return entry;
+            });
             return ok(truncate(lines.join("\n\n"), TOOL_OUTPUT_CAP));
           } catch (e) {
             if (e instanceof ConnectorNotAvailableError) {
