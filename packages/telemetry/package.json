@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/telemetry",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Qode — Shared telemetry and analytics infrastructure",
   "type": "module",
   "main": "./dist/index.mjs",

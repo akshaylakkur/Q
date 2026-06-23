@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/q-remote",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Qode — Headless remote agent daemon for cloud execution",
   "type": "module",
   "bin": {

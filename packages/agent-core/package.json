@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/agent-core",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Qode — Core agent engine: agent loop, tool execution, sub-agents",
   "type": "module",
   "main": "./dist/index.mjs",

@@ -1,7 +1,7 @@
 {
   "name": "q-cli-monorepo",
   "private": true,
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Qode — Autonomous Coding Agent",
   "engines": {
     "node": ">=22.19.0"

@@ -1,6 +1,6 @@
 {
   "name": "@qode-agent/cli",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Qode — Autonomous Coding Agent CLI",
   "type": "module",
   "bin": {
