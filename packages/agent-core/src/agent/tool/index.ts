@@ -789,7 +789,9 @@ function createWebSearchTool(webConnector: WebConnector): ExecutableTool {
   return {
     name: "WebSearch",
     description:
-      "Search the web. Requires a configured search provider. " +
+      "Search the web for current information. This is the PREFERRED method for all web searches -- " +
+      "use this tool instead of curl, wget, or any other approach when you need to find information " +
+      "from the internet. Requires a configured search provider. " +
       "Returns a list of results with title, url, snippet, and full article content when available.",
     parameters: {
       type: "object",

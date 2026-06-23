@@ -1,10 +1,16 @@
 {
   "name": "@qode-agent/darwin-arm64",
-  "version": "0.1.0",
+  "version": "0.3.10",
   "description": "Qode binary for macOS ARM64 (Apple Silicon)",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
-  "files": ["bin/"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/"
+  ],
   "bin": {
     "qode-agent": "bin/qode"
   },
